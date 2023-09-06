@@ -1,19 +1,17 @@
 import numpy as np
 import os
 import sys
-sys.path.append('/Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages ')
-print(sys.path)
+
 #import torch
-import neat
-#import gymnasium as gym
+#import neat
+import gym
 
 import config
-import stable_baselines3
+from stable_baselines3 import PPO
 from toric_game_env import ToricGameEnv
 from game import ToricCodeGame
 from config import GameMode, RewardMode, ErrorModel
 from perspectives import Perspectives
-from stable_baselines3 import PPO
 from stable_baselines3.ppo.policies import MlpPolicy
 from stable_baselines3.common.evaluation import evaluate_policy
 

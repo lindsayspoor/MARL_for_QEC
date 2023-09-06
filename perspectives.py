@@ -80,7 +80,7 @@ class Perspectives():
                             transformed_slices[key] = slice.flatten()
 
                         # Concatenate the indices
-                        self.perspectives[rot_i][tuple(plaq)] =np.array([], dtype=np.int)
+                        self.perspectives[rot_i][tuple(plaq)] =np.array([], dtype=int)
                         # To use symmetric roles of plaquette and stars, we normalize the order of the input
                         index0, index1 = channel, (channel+1)%2
                         ordered_keys = ["op_"+str(index0), "qubit_"+str(index0), "op_"+str(index1), "qubit_"+str(index1)]
