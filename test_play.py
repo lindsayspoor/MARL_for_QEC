@@ -48,6 +48,7 @@ while not done:
     img, reward, done, current_state = env.step(q[redo_qubit[0]], pauli_opt, without_illegal_actions=False)
     
     print(f"current reward: {reward}")
+    print(img)
     print(current_state)
     env.render()
 

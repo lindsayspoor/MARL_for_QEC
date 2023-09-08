@@ -2,7 +2,7 @@
 from scipy.special import softmax
 import numpy as np
 import time
-#import neat
+import neat
 
 from toric_game_env import ToricGameEnv
 from perspectives import Perspectives

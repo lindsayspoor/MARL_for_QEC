@@ -1,8 +1,12 @@
 from __future__ import division
+from typing import Any
 import numpy as np
 
-import gym
-from gym.utils import seeding
+import gymnasium as gym
+#import gym
+from gymnasium.utils import seeding
+from gymnasium import spaces
+import gymnasium
 import sys, os
 import matplotlib.pyplot as plt
 
@@ -14,7 +18,7 @@ class ToricGameEnv(gym.Env):
     ToricGameEnv environment. Effective single player game.
     '''
 
-    def __init__(self, board_size, error_model, channels, memory):
+    def __init__(self, board_size, error_rate, num_initial_errors, error_model, channels, memory):
         """
         Args:
             opponent: Fixed
@@ -24,6 +28,8 @@ class ToricGameEnv(gym.Env):
         self.error_model = error_model
         self.channels = channels
         self.memory = memory
+        self.error_rate = error_rate
+        self.num_initial_errors = num_initial_errors
 
         # Keep track of the moves
         self.qubits_flips = [[],[]]
@@ -33,22 +39,27 @@ class ToricGameEnv(gym.Env):
         self.state = Board(self.board_size)
         self.done = None
 
+        self.observation_space = spaces.MultiBinary(self.board_size*self.board_size) #3x3 plaquettes on which we can view syndromes
+        #self.observation_space= self.state.encode(self.channels, self.memory)
+        self.action_space = spaces.discrete.Discrete(len(self.state.qubit_pos)) #0-17 qubits on which a bit-flip error can be introduced
+        #self.action_space=self.state
+
+
+
     def seed(self, seed=None):
         self.np_random, seed1 = seeding.np_random(seed)
         # Derive a random seed.
         seed2 = seeding.hash_seed(seed1 + 1) % 2**32
         return [seed1, seed2]
 
-    def generate_errors(self, error_rate):
+    def generate_errors(self):
         # Reset the board state
         self.state.reset()
 
         # Let the opponent do it's initial evil
         self.qubits_flips = [[],[]]
         self.initial_qubits_flips = [[],[]]
-        self._set_initial_errors(error_rate)
-
-        print("Initial errors", self.initial_qubits_flips)
+        self._set_initial_errors(self.error_rate)
 
         self.done = self.state.is_terminal()
         self.reward = 0
@@ -58,6 +69,12 @@ class ToricGameEnv(gym.Env):
                 self.reward = -1
 
         return self.state.encode(self.channels, self.memory)
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[Any, dict[str, Any]]:
+         super().reset(seed=seed, options=options)
+         initial_observation = self.generate_errors()
+         return initial_observation, {'state': self.state, 'message':"reset"}
+
 
 
 
@@ -109,7 +126,7 @@ class ToricGameEnv(gym.Env):
         plt.axis('off')
         plt.show()
 
-    def step(self, location, pauli_opt, without_illegal_actions=False):
+    def step(self, location,  without_illegal_actions=False):
         '''
         Args:
             location: coord of the qubit to flip
@@ -123,18 +140,21 @@ class ToricGameEnv(gym.Env):
         # If already terminal, then don't do anything, count as win
         if self.done:
             self.reward = 1
-            return self.state.encode(self.channels, self.memory), 1., True, {'state': self.state, 'message':"success"}
+            return self.state.encode(self.channels, self.memory), 1., True, False,{'state': self.state, 'message':"success"}
 
         # Check if we flipped twice the same qubit
-        pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
-        pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
+        #pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
+        #pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
+        pauli_opt=0
+        pauli_X_flip=True
+        pauli_Z_flip=False
 
         #'''
         if not without_illegal_actions:
             if pauli_X_flip and location in self.qubits_flips[0]:
-                return self.state.encode(self.channels, self.memory), -1.0, True, {'state': self.state, 'message': "illegal_action"}
+                return self.state.encode(self.channels, self.memory), -1.0, True, False,{'state': self.state, 'message': "illegal_action"}
             if pauli_Z_flip and location in self.qubits_flips[1]:
-                return self.state.encode(self.channels, self.memory), -1.0, True, {'state': self.state, 'message': "illegal_action"}
+                return self.state.encode(self.channels, self.memory), -1.0, True, False,{'state': self.state, 'message': "illegal_action"}
         #'''
 
         if pauli_X_flip:
@@ -142,21 +162,24 @@ class ToricGameEnv(gym.Env):
 
         if pauli_Z_flip:
             self.qubits_flips[1].append(location)
+        
+        #print(f"location to flip={location}")
 
-        self.state.act(location, pauli_opt)
+        self.state.act(self.state.qubit_pos[location], pauli_opt)
+
 
 
         # Reward: if nonterminal, then the reward is 0
         if not self.state.is_terminal():
             self.done = False
             self.reward = 0
-            return self.state.encode(self.channels, self.memory), 0., False, {'state': self.state, 'message':"continue"}
+            return self.state.encode(self.channels, self.memory), 0., False, False,{'state': self.state, 'message':"continue"}
         # We're in a terminal state. Reward is 1 if won, -1 if lost
         self.done = True
         if self.state.has_logical_error(self.initial_qubits_flips):
-            return self.state.encode(self.channels, self.memory), -1.0, True, {'state': self.state, 'message':"logical_error"}
+            return self.state.encode(self.channels, self.memory), -1.0, True, False,{'state': self.state, 'message':"logical_error"}
         else:
-            return self.state.encode(self.channels, self.memory), 1.0, True, {'state': self.state, 'message':"success"}
+            return self.state.encode(self.channels, self.memory), 1.0, True, False,{'state': self.state, 'message':"success"}
 
 
 
@@ -166,25 +189,25 @@ class ToricGameEnv(gym.Env):
         '''
         # Probabilitic mode
         # Pick random sites according to error rate
+        for q in np.random.randint(0,len(self.state.qubit_pos), self.num_initial_errors):
+            q = self.state.qubit_pos[q]
+            #if np.random.rand() < error_rate:
+                #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
+            if self.error_model == ErrorModel["UNCORRELATED"]:
+                pauli_opt = 0
+            elif self.error_model == ErrorModel["DEPOLARIZING"]:
+                pauli_opt = np.random.randint(0,3)
 
-        for q in self.state.qubit_pos:
-            if np.random.rand() < error_rate:
-                print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
-                if self.error_model == ErrorModel["UNCORRELATED"]:
-                    pauli_opt = 0
-                elif self.error_model == ErrorModel["DEPOLARIZING"]:
-                    pauli_opt = np.random.randint(0,3)
-
-                pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
-                pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
+            pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
+            pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
 
 
-                if pauli_X_flip:
-                    self.initial_qubits_flips[0].append( q )
-                if pauli_Z_flip:
-                    self.initial_qubits_flips[1].append( q )
+            if pauli_X_flip:
+                self.initial_qubits_flips[0].append( q )
+            if pauli_Z_flip:
+                self.initial_qubits_flips[1].append( q )
 
-                self.state.act(q, pauli_opt)
+            self.state.act(q, pauli_opt)
 
         # Now unflip the qubits, they're a secret
         self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))
@@ -246,7 +269,7 @@ class Board(object):
 
     def reset(self):
         #self.board_state = np.zeros( (2, 2*self.size, 2*self.size) )
-
+        
         self.qubit_values = np.zeros((2, 2*self.size*self.size))
         self.op_values = np.zeros((2, self.size*self.size))
 
@@ -261,7 +284,11 @@ class Board(object):
         pauli_X_flip = (operator==0 or operator==2)
         pauli_Z_flip = (operator==1 or operator==2)
 
-        qubit_index = self.qubit_pos.index(coord)
+
+
+        #qubit_index = self.qubit_pos.index(coord)
+        qubit_index=self.qubit_pos.index(coord)
+        #coord = self.qubit_pos[coord]
 
         # Flip it!
         if pauli_X_flip:
@@ -374,7 +401,6 @@ class Board(object):
             img = np.concatenate((img, self.op_values[channel]))
             if memory:
                 img = np.concatenate((img, self.qubit_values[channel]))
-        print(f"img: {img}")
 
         return img
 
