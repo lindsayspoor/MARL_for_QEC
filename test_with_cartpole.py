@@ -3,7 +3,7 @@ import os
 import sys
 #import torch
 #import neat
-import gym
+import gymnasium as gym
 
 
 
@@ -22,26 +22,6 @@ from stable_baselines3.common.logger import TensorBoardOutputFormat
 
 
 
-#board_size = config.get_default_config()["Physics"]["distance"]
-board_size = 3
-#error_model = config.get_default_config()["Physics"]["error_model"]
-error_model = ErrorModel['UNCORRELATED']
-max_steps = config.get_default_config()["Training"]["max_steps"]
-epsilon = config.get_default_config()["Training"]["epsilon"]
-rotation_invariant_decoder = config.get_default_config()["Training"]["rotation_invariant_decoder"]
-
-if error_model == ErrorModel['UNCORRELATED']:
-    channels=[0]
-elif error_model == ErrorModel['DEPOLARIZING']:
-    channels=[0,1]
-
-perspectives = Perspectives(board_size,
-                    channels, config.get_default_config()['Training']['memory'])
-
-error_rate=0.2
-pauli_opt=0
-num_initial_errors = 3
-
 def evaluate_PPO_agent(model, number_evaluations, render):
     removed_syndromes=0
     moves=0
@@ -55,8 +35,8 @@ def evaluate_PPO_agent(model, number_evaluations, render):
             obs, reward, done, truncated, info = env.step(action, without_illegal_actions=True)
             moves+=1
             #rewards+=reward
-            if render:
-                env.render()
+            #if render:
+                #env.render()
             if done:
                 if reward == -1:
                     print("Game over, logical error!")
@@ -65,7 +45,7 @@ def evaluate_PPO_agent(model, number_evaluations, render):
                 if reward==1:
                     if render:
                         env.render()
-                    env.reset()
+                env.reset()
 
         #print(f"successfully removed syndromes = {removed_syndromes}")
         #print(f"total number of moves = {moves}")
@@ -79,36 +59,19 @@ def evaluate_PPO_agent(model, number_evaluations, render):
     return mean_removed_syndromes, mean_moves
 
 
-env = ToricGameEnv(board_size, error_rate, num_initial_errors, error_model, channels, config.get_default_config()['Training']['memory'])
+env = gym.make("CartPole-v1")
+
+model = PPO(MlpPolicy, env, verbose=0)
 
 
-
-#EVALUATE PPO AGENT
-
-#evaluate un-trained agent
-learning_rate=0.0005
-
-model = PPO(MlpPolicy, env, learning_rate=learning_rate, verbose=0)
 
 mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=100, warn=False)
 
 
 
 print(f"mean_reward: {mean_reward:.2f} +/- {std_reward:.2f}")
-
-# Train the agent for ... steps
-total_timesteps=1000000
-model.learn(total_timesteps=total_timesteps, progress_bar=True)
-model.save(f"ppo_mlp_{total_timesteps}_timestep_lr_{learning_rate}_incentive_punishment")
-#model=PPO.load(f"ppo_mlp_{total_timesteps}_timestep_lr_{learning_rate}")
-
-number_evaluations=100
-
-mean_removed_syndromes, mean_moves = evaluate_PPO_agent(model, number_evaluations, render=False)
-
-
-print(f"mean number of successfully removed syndromes = {mean_removed_syndromes}")
-print(f"mean total number of moves = {mean_moves}")
+# Train the agent for 10000 steps
+model.learn(total_timesteps=10_000)
 
 
 # Evaluate the trained agent

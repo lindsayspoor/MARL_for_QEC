@@ -164,20 +164,25 @@ class ToricGameEnv(gym.Env):
             self.qubits_flips[1].append(location)
         
         #print(f"location to flip={location}")
-
+        number_syndromes_before=len(self.state.syndrome_pos)
         self.state.act(self.state.qubit_pos[location], pauli_opt)
+        #print(f"there are {len(self.state.syndrome_pos)} syndromes")
+        number_syndromes_after=len(self.state.syndrome_pos)
 
 
 
         # Reward: if nonterminal, then the reward is 0
         if not self.state.is_terminal():
             self.done = False
-            self.reward = 0
-            return self.state.encode(self.channels, self.memory), 0., False, False,{'state': self.state, 'message':"continue"}
+            #self.reward = 0
+            if number_syndromes_after<number_syndromes_before:
+                return self.state.encode(self.channels, self.memory), 0.25, False, False,{'state': self.state, 'message':"continue"}
+            else:
+                return self.state.encode(self.channels, self.memory), 0.0, False, False,{'state': self.state, 'message':"continue"}
         # We're in a terminal state. Reward is 1 if won, -1 if lost
         self.done = True
         if self.state.has_logical_error(self.initial_qubits_flips):
-            return self.state.encode(self.channels, self.memory), -1.0, True, False,{'state': self.state, 'message':"logical_error"}
+            return self.state.encode(self.channels, self.memory), -1.5, True, False,{'state': self.state, 'message':"logical_error"}
         else:
             return self.state.encode(self.channels, self.memory), 1.0, True, False,{'state': self.state, 'message':"success"}
 
@@ -192,7 +197,7 @@ class ToricGameEnv(gym.Env):
         for q in np.random.randint(0,len(self.state.qubit_pos), self.num_initial_errors):
             q = self.state.qubit_pos[q]
             #if np.random.rand() < error_rate:
-                #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
+            #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
             if self.error_model == ErrorModel["UNCORRELATED"]:
                 pauli_opt = 0
             elif self.error_model == ErrorModel["DEPOLARIZING"]:
