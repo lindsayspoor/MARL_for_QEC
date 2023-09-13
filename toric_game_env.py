@@ -18,7 +18,7 @@ class ToricGameEnv(gym.Env):
     ToricGameEnv environment. Effective single player game.
     '''
 
-    def __init__(self, board_size, error_rate, num_initial_errors, error_model, channels, memory):
+    def __init__(self, board_size, error_rate, num_initial_errors, logical_error_reward, continue_reward,error_model, channels, memory):
         """
         Args:
             opponent: Fixed
@@ -30,6 +30,8 @@ class ToricGameEnv(gym.Env):
         self.memory = memory
         self.error_rate = error_rate
         self.num_initial_errors = num_initial_errors
+        self.logical_error_reward=logical_error_reward
+        self.continue_reward=continue_reward
 
         # Keep track of the moves
         self.qubits_flips = [[],[]]
@@ -176,13 +178,13 @@ class ToricGameEnv(gym.Env):
             self.done = False
             #self.reward = 0
             if number_syndromes_after<number_syndromes_before:
-                return self.state.encode(self.channels, self.memory), 0.25, False, False,{'state': self.state, 'message':"continue"}
+                return self.state.encode(self.channels, self.memory), self.continue_reward, False, False,{'state': self.state, 'message':"continue"}
             else:
                 return self.state.encode(self.channels, self.memory), 0.0, False, False,{'state': self.state, 'message':"continue"}
         # We're in a terminal state. Reward is 1 if won, -1 if lost
         self.done = True
         if self.state.has_logical_error(self.initial_qubits_flips):
-            return self.state.encode(self.channels, self.memory), -1.5, True, False,{'state': self.state, 'message':"logical_error"}
+            return self.state.encode(self.channels, self.memory), self.logical_error_reward, True, False,{'state': self.state, 'message':"logical_error"}
         else:
             return self.state.encode(self.channels, self.memory), 1.0, True, False,{'state': self.state, 'message':"success"}
 
