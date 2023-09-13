@@ -18,7 +18,7 @@ class ToricGameEnv(gym.Env):
     ToricGameEnv environment. Effective single player game.
     '''
 
-    def __init__(self, board_size, error_rate, num_initial_errors, logical_error_reward, continue_reward, success_reward,error_model, channels, memory):
+    def __init__(self, board_size, error_rate, num_initial_errors, logical_error_reward, continue_reward,error_model, channels, memory):
         """
         Args:
             opponent: Fixed
@@ -32,7 +32,6 @@ class ToricGameEnv(gym.Env):
         self.num_initial_errors = num_initial_errors
         self.logical_error_reward=logical_error_reward
         self.continue_reward=continue_reward
-        self.success_reward=success_reward
 
         # Keep track of the moves
         self.qubits_flips = [[],[]]
@@ -42,7 +41,7 @@ class ToricGameEnv(gym.Env):
         self.state = Board(self.board_size)
         self.done = None
 
-        self.observation_space = spaces.MultiBinary(self.board_size*self.board_size) #3x3 plaquettes on which we can view syndromes
+        self.observation_space = spaces.Box(0,1, shape=(self.board_size,self.board_size), dtype=int) #3x3 plaquettes on which we can view syndromes
         #self.observation_space= self.state.encode(self.channels, self.memory)
         self.action_space = spaces.discrete.Discrete(len(self.state.qubit_pos)) #0-17 qubits on which a bit-flip error can be introduced
         #self.action_space=self.state
@@ -188,7 +187,7 @@ class ToricGameEnv(gym.Env):
         if self.state.has_logical_error(self.initial_qubits_flips):
             return self.state.encode(self.channels, self.memory), self.logical_error_reward, True, False,{'state': self.state, 'message':"logical_error"}
         else:
-            return self.state.encode(self.channels, self.memory), self.success_reward, True, False,{'state': self.state, 'message':"success"}
+            return self.state.encode(self.channels, self.memory), 1.0, True, False,{'state': self.state, 'message':"success"}
 
     def generate_new_error(self):
         q = np.random.randint(0,len(self.state.qubit_pos))

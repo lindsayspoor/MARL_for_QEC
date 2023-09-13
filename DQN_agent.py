@@ -5,7 +5,7 @@ from stable_baselines3 import PPO, DQN
 from toric_game_env import ToricGameEnv
 from config import GameMode, RewardMode, ErrorModel
 #from perspectives import Perspectives
-from stable_baselines3.ppo.policies import MlpPolicy, CnnPolicy
+from stable_baselines3.dqn.policies import MlpPolicy, CnnPolicy
 from stable_baselines3.common.evaluation import evaluate_policy
 import os
 os.getcwd()
@@ -31,7 +31,7 @@ perspectives = Perspectives(board_size,
 
 '''
 
-def evaluate_PPO_agent(model, number_evaluations, max_moves,logical_error_reward, success_reward,render):
+def evaluate_DQN_agent(model, number_evaluations, max_moves,logical_error_reward, success_reward,render):
     removed_syndromes=0
     moves_all=[]
     fail=0
@@ -77,11 +77,11 @@ def evaluate_PPO_agent(model, number_evaluations, max_moves,logical_error_reward
 
 def train_model(model, total_timesteps, learning_rate,num_initial_errors, logical_error_reward, continue_reward, success_reward,):
     model.learn(total_timesteps=total_timesteps, progress_bar=True)
-    model.save(f"trained_models/ppo_mlp_{total_timesteps}_timestep_initial_errors{num_initial_errors}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
+    model.save(f"trained_models/dqn_mlp_{total_timesteps}_timestep_initial_errors{num_initial_errors}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
     return model
 
 def initialise_model(model, total_timesteps, learning_rate, num_initial_errors,logical_error_reward, continue_reward):
-    model=PPO.load(f"trained_models/ppo_mlp_{total_timesteps}_timestep_initial_errors{num_initial_errors}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
+    model=DQN.load(f"trained_models/dqn_mlp_{total_timesteps}_timestep_initial_errors{num_initial_errors}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
     return model
 
 error_rate=0.2
@@ -104,7 +104,7 @@ env = ToricGameEnv(board_size, error_rate, num_initial_errors, logical_error_rew
 #EVALUATE PPO/DQN AGENT
 
 #evaluate un-trained agent
-model = PPO(MlpPolicy, env, learning_rate=learning_rate, verbose=0)
+model = DQN(MlpPolicy, env, learning_rate=learning_rate, verbose=0)
 mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=100, warn=False)
 
 print(f"mean_reward: {mean_reward:.2f} +/- {std_reward:.2f}")
@@ -116,7 +116,7 @@ else:
     model=initialise_model(model, total_timesteps, learning_rate, num_initial_errors, logical_error_reward, continue_reward, success_reward)
 
 
-mean_removed_syndromes, mean_moves, succes_rate = evaluate_PPO_agent(model, number_evaluations, max_moves, logical_error_reward, success_reward,render)
+mean_removed_syndromes, mean_moves, succes_rate = evaluate_DQN_agent(model, number_evaluations, max_moves, logical_error_reward, success_reward,render)
 
 
 print(f"mean number of successfully removed syndromes = {mean_removed_syndromes}")
