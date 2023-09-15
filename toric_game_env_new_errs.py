@@ -63,7 +63,7 @@ class ToricGameEnv(gym.Env):
         # Let the opponent do it's initial evil
         self.qubits_flips = [[],[]]
         self.initial_qubits_flips = [[],[]]
-        self._set_initial_errors()
+        self._set_initial_errors(self.error_rate)
 
         self.done = self.state.is_terminal()
         self.reward = 0
@@ -169,17 +169,24 @@ class ToricGameEnv(gym.Env):
         if pauli_Z_flip:
             self.qubits_flips[1].append(location)
 
-        number_syndromes_before=len(self.state.syndrome_pos)
-        self.state.act(self.state.qubit_pos[location], pauli_opt)
-        number_syndromes_after=len(self.state.syndrome_pos)
 
+        self.state.act(self.state.qubit_pos[location], pauli_opt)
+
+        #introduce new error
+        #print(len(self.qubits_flips[0]))
+        if (len(self.qubits_flips[0])%3 ==  0):
+        #if (len(self.qubits_flips[0]) > 1):
+            self.generate_new_error()
 
 
 
         # Reward: if nonterminal, then the reward is 0
         if not self.state.is_terminal():
             self.done = False
-            return self.state.encode(self.channels, self.memory), self.continue_reward, False, False,{'state': self.state, 'message':"continue"}
+            if self.state.has_logical_error(self.initial_qubits_flips): #now game over can happen after every move if it results in a logical error!
+                return self.state.encode(self.channels, self.memory), self.logical_error_reward, True, False,{'state': self.state, 'message':"logical_error"}
+            else:
+                return self.state.encode(self.channels, self.memory), self.continue_reward, False, False,{'state': self.state, 'message':"continue"}
         # We're in a terminal state. Reward is 1 if won, -1 if lost
         self.done = True
         if self.state.has_logical_error(self.initial_qubits_flips):
@@ -188,6 +195,7 @@ class ToricGameEnv(gym.Env):
             return self.state.encode(self.channels, self.memory), self.success_reward, True, False,{'state': self.state, 'message':"success"}
 
     def generate_new_error(self):
+        self.state.reset()
         q = np.random.randint(0,len(self.state.qubit_pos))
         q = self.state.qubit_pos[q]
 
@@ -201,20 +209,22 @@ class ToricGameEnv(gym.Env):
             self.initial_qubits_flips[1].append( q )
 
         self.state.act(q, pauli_opt)
-        #self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))
+        # Now unflip the qubits, they're a secret
+        self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))
 
 
-    def _set_initial_errors(self):
+
+    def _set_initial_errors(self, error_rate):
         ''' Set random initial errors with an %error_rate rate
             but report only the syndrome
         '''
         # Probabilitic mode
         # Pick random sites according to error rate
         for q in np.random.randint(0,len(self.state.qubit_pos), self.num_initial_errors):
-        #for q in [4,7,15]:
-        #for q in self.state.qubit_pos:    
+        #for q in [4,5,13]:
+            
             q = self.state.qubit_pos[q]
-            #if np.random.rand() < self.error_rate:
+            #if np.random.rand() < error_rate:
             #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
             if self.error_model == ErrorModel["UNCORRELATED"]:
                 pauli_opt = 0

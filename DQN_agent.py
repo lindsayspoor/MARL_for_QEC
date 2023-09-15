@@ -80,18 +80,18 @@ def train_model(model, total_timesteps, learning_rate,num_initial_errors, logica
     model.save(f"trained_models/dqn_mlp_{total_timesteps}_timestep_initial_errors{num_initial_errors}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
     return model
 
-def initialise_model(model, total_timesteps, learning_rate, num_initial_errors,logical_error_reward, continue_reward):
-    model=DQN.load(f"trained_models/dqn_mlp_{total_timesteps}_timestep_initial_errors{num_initial_errors}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
+def initialise_model(model, total_timesteps, learning_rate, num_initial_errors,logical_error_reward, continue_reward, success_reward):
+    model=DQN.load(f"trained_models/dqn_mlp_{total_timesteps}_timestep_initial_errors{num_initial_errors}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}")
     return model
 
 error_rate=0.2
 pauli_opt=0
 num_initial_errors = 2
-logical_error_reward=-1
-success_reward=1
-continue_reward=0.0
+logical_error_reward=0.0
+success_reward=1000
+continue_reward=-1.0
 learning_rate=0.0005
-total_timesteps=100000
+total_timesteps=1000000
 train=True
 number_evaluations=1000
 max_moves=20

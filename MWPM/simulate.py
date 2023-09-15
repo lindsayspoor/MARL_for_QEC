@@ -3,6 +3,7 @@ from MWPM_decoder import simulate_MWPM
 #from UF_decoder import simulate_UF
 import matplotlib.pyplot as plt
 from collections import defaultdict
+import numpy as np
 
 
 def gen_px_delta(start, end, delta):  # generate px
@@ -28,18 +29,18 @@ if __name__ == '__main__':
     # decoder = 'peeling'
 
     # gridsizes to simulate:
-    all_L = [3] #MWPM
+    all_L = [3,5] #MWPM
     #all_L = [9, 17, 25, 33, 41]  # UF
 
     N = 1000  # number of simulations
     delta_p = 0.001  # distance between px # 0.00x = 0.x%
-    p_start = 0.1
-    p_end = 0.180
+    p_start = 0.01
+    p_end = 0.25
     plot_file_name = decoder + '_L=' + ','.join([str(x) for x in all_L]) + '_N=' + str(
         N) + 'p_start=' + str(p_start).replace('.', ',') + 'p_end=' + str(p_end).replace('.', ',') + '.png'
     tex_plot = False
     save_data = True
-    plot_all = True  # plot all available data if True, else only data from this run
+    plot_all = False  # plot all available data if True, else only data from this run
     data_filename = 'data_' + decoder + '.txt'
     # odd: threshold around 0.1
     # even: threshold around 0.12
@@ -56,6 +57,9 @@ if __name__ == '__main__':
         sim_func = False
     data = []
     all_px = gen_px_delta(p_start, p_end, delta_p)
+    #all_px.append(0.11)
+    #all_px.append(0.167)
+
     for L in all_L:
         print('L = ', L)
         for p_idx in range(len(all_px)):
@@ -118,12 +122,18 @@ if __name__ == '__main__':
         p_corr[L].append(100*p_c)
         errorbars[L].append(std(el[2], el[3]))
 
-    for L in all_L:
-        plt.errorbar(p_x[L], p_corr[L], yerr=errorbars[L], linestyle='-.', label=r'$L = ' + str(L) + '$')
+
+
+    success_rates_d_3 = np.loadtxt("success_rate_ppo_mlp_timesteps_1000000_lr_0.0005_d_3_sr_1.0_cr_0.0_ler_-1.0.csv", delimiter=',')
+    success_rates_d_5 = np.loadtxt("success_rate_ppo_mlp_timesteps_1000000_lr_0.0005_d_5_sr_1.0_cr_0.0_ler_-1.0.csv", delimiter=',')
+    plt.errorbar(p_x[3], p_corr[3], yerr=errorbars[3],linestyle='-.', label=r'$d = ' + str(3) + '$' + " MWPM", color='blue', linewidth = 0.5)
+    plt.errorbar(p_x[5], p_corr[5], yerr=errorbars[5],linestyle='-.', label=r'$d = ' + str(5) + '$' + " MWPM", color='red', linewidth = 0.5)
+    plt.scatter(np.linspace(0.05,0.25,5), success_rates_d_3*100, label="d=3 PPO agent", color='darkblue', marker="^", s=30)
+    plt.scatter(np.linspace(0.05,0.25,5), success_rates_d_5*100, label="d=5 PPO agent", color='darkred', marker="^", s=30)
     plt.axis([p_start, p_end, 0, 100])
-    plt.title(r'Toric Code - ' + decoder)
+    plt.title(r'Toric Code - ' + decoder + r" reward scheme $r_{success}$=1, $r_{fail}$=-1, $r_{move}$=0")
     plt.xlabel(r'$p_x$')
-    plt.ylabel(r'Correct[\%]')
+    plt.ylabel(r'Correct[\%] $p_s$')
     plt.legend()
 
     plt.savefig(plot_file_name)
