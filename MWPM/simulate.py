@@ -28,16 +28,37 @@ if __name__ == '__main__':
     #decoder = 'UF'
     # decoder = 'peeling'
 
+    #settings
+    board_size = 3
+    error_rates=np.linspace(0.05, 0.25, 5)
+    #error_rates=[0.2]
+    error_rate=0.2
+    pauli_opt=0
+    num_initial_errors = 3
+    logical_error_reward=-1.0
+    success_reward=1.0
+    continue_reward=0.0
+    learning_rate=0.0005
+    total_timesteps=1000000
+    train=True
+    number_evaluations=1000
+    max_moves=200
+    render=False
+    with_error_rates=True
+    random_error_distribution = False
+
     # gridsizes to simulate:
-    all_L = [3,5] #MWPM
+    all_L = [3] #MWPM
     #all_L = [9, 17, 25, 33, 41]  # UF
 
     N = 1000  # number of simulations
     delta_p = 0.001  # distance between px # 0.00x = 0.x%
+    #delta_p = 0.1  # distance between px # 0.00x = 0.x%
     p_start = 0.01
     p_end = 0.25
-    plot_file_name = decoder + '_L=' + ','.join([str(x) for x in all_L]) + '_N=' + str(
-        N) + 'p_start=' + str(p_start).replace('.', ',') + 'p_end=' + str(p_end).replace('.', ',') + '.png'
+    path = 'Results_benchmarks/'
+    plot_file_name = path + decoder + '_L=' + ','.join([str(x) for x in all_L]) + '_N=' + str(
+        N) + 'p_start=' + str(p_start).replace('.', ',') + 'p_end=' + str(p_end).replace('.', ',') + '.pdf'
     tex_plot = False
     save_data = True
     plot_all = False  # plot all available data if True, else only data from this run
@@ -123,15 +144,19 @@ if __name__ == '__main__':
         errorbars[L].append(std(el[2], el[3]))
 
 
+    plt.figure()
+    for i in range(len(all_L)):
+        plt.errorbar(p_x[all_L[i]], p_corr[all_L[i]], yerr=errorbars[all_L[i]],linestyle='-.', label=r'$d = ' + str(all_L[i]) + '$' + " MWPM", color='blue', linewidth = 0.5)
 
-    success_rates_d_3 = np.loadtxt("success_rate_ppo_mlp_timesteps_1000000_lr_0.0005_d_3_sr_1.0_cr_0.0_ler_-1.0.csv", delimiter=',')
-    success_rates_d_5 = np.loadtxt("success_rate_ppo_mlp_timesteps_1000000_lr_0.0005_d_5_sr_1.0_cr_0.0_ler_-1.0.csv", delimiter=',')
-    plt.errorbar(p_x[3], p_corr[3], yerr=errorbars[3],linestyle='-.', label=r'$d = ' + str(3) + '$' + " MWPM", color='blue', linewidth = 0.5)
-    plt.errorbar(p_x[5], p_corr[5], yerr=errorbars[5],linestyle='-.', label=r'$d = ' + str(5) + '$' + " MWPM", color='red', linewidth = 0.5)
-    plt.scatter(np.linspace(0.05,0.25,5), success_rates_d_3*100, label="d=3 PPO agent", color='darkblue', marker="^", s=30)
-    plt.scatter(np.linspace(0.05,0.25,5), success_rates_d_5*100, label="d=5 PPO agent", color='darkred', marker="^", s=30)
+        success_rates_random = np.loadtxt(f"files_success_rates/success_rate_ppo_mlp_timesteps_{total_timesteps}_lr_{learning_rate}_d_{all_L[i]}_sr_{success_reward}_cr_{continue_reward}_ler_{logical_error_reward}.csv", delimiter=",")
+        success_rates_random_local = np.loadtxt(f"files_success_rates/success_rates_ppo_mlp_random_local_timesteps_{total_timesteps}_lr_{learning_rate}_d_{all_L[i]}_sr_{success_reward}_cr_{continue_reward}_ler_{logical_error_reward}.csv", delimiter=",")
+       
+        success_rates_local = np.loadtxt(f"files_success_rates/success_rates_ppo_mlp_local_timesteps_{total_timesteps}_lr_{learning_rate}_d_{all_L[i]}_sr_{success_reward}_cr_{continue_reward}_ler_{logical_error_reward}.csv", delimiter=",")
+        plt.scatter(np.linspace(0.05,0.25,5), success_rates_random*100, label=f"d={all_L[i]} PPO agent, trained & evaluated on random errors", color='darkblue', marker="^", s=30)
+        plt.scatter(np.linspace(0.05,0.25,5), success_rates_local*100, label=f"d={all_L[i]} PPO agent, trained & evaluated on local errors", color='red', marker="^", s=30)
+        plt.scatter(np.linspace(0.05,0.25,5), success_rates_random_local*100, label=f"d={all_L[i]} PPO agent, trained on random errors, evaluated on local errors", color='green', marker="^", s=30)
     plt.axis([p_start, p_end, 0, 100])
-    plt.title(r'Toric Code - ' + decoder + r" reward scheme $r_{success}$=1, $r_{fail}$=-1, $r_{move}$=0")
+    plt.title(r'Toric Code - ' + decoder + f" reward scheme r_succ={success_reward}, r_fail={logical_error_reward}, r_move={continue_reward}")
     plt.xlabel(r'$p_x$')
     plt.ylabel(r'Correct[\%] $p_s$')
     plt.legend()

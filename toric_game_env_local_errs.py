@@ -9,11 +9,12 @@ from gymnasium import spaces
 import gymnasium
 import sys, os
 import matplotlib.pyplot as plt
+from scipy.spatial import distance_matrix
 
 from config import ErrorModel
 
 ### Environment
-class ToricGameEnv(gym.Env):
+class ToricGameEnvLocalErrs(gym.Env):
     '''
     ToricGameEnv environment. Effective single player game.
     '''
@@ -212,10 +213,28 @@ class ToricGameEnv(gym.Env):
         # Pick random sites according to error rate
         #for q in np.random.randint(0,len(self.state.qubit_pos), self.num_initial_errors):
         #for q in [4,7,15]:
-        for q in self.state.qubit_pos:    
-        #q = self.state.qubit_pos[q]
-            if np.random.rand() < self.error_rate:
-            #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
+
+
+        probability_matrix = np.random.rand(len(self.state.qubit_pos))
+
+
+        #first choose the first qubit to flip
+        for i in range(len(probability_matrix)):
+            if probability_matrix[i] < self.error_rate:
+                index_qubit = i
+
+                dist_matrix = distance_matrix(self.state.qubit_pos, self.state.qubit_pos)
+                selected_dist_matrix = dist_matrix[index_qubit]/np.sum(dist_matrix[index_qubit])
+                weighted_matrix = (1-selected_dist_matrix)
+                where_zero = np.argwhere(weighted_matrix == np.max(weighted_matrix))[0]
+                weighted_matrix[where_zero] = 0
+                #multiply with original error rate per qubit
+                probability_matrix =np.multiply(probability_matrix, weighted_matrix)
+                #probability_matrix = probability_matrix / np.sum(probability_matrix)
+                
+
+                q = self.state.qubit_pos[index_qubit]
+                #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
                 if self.error_model == ErrorModel["UNCORRELATED"]:
                     pauli_opt = 0
                 elif self.error_model == ErrorModel["DEPOLARIZING"]:
@@ -231,6 +250,31 @@ class ToricGameEnv(gym.Env):
                     self.initial_qubits_flips[1].append( q )
 
                 self.state.act(q, pauli_opt)
+            break
+        
+
+        for i in range(len(probability_matrix)):
+            if probability_matrix[i] < self.error_rate:
+                index_qubit = i
+
+                q = self.state.qubit_pos[index_qubit]
+                #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
+                if self.error_model == ErrorModel["UNCORRELATED"]:
+                    pauli_opt = 0
+                elif self.error_model == ErrorModel["DEPOLARIZING"]:
+                    pauli_opt = np.random.randint(0,3)
+
+                pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
+                pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
+
+
+                if pauli_X_flip:
+                    self.initial_qubits_flips[0].append( q )
+                if pauli_Z_flip:
+                    self.initial_qubits_flips[1].append( q )
+
+                self.state.act(q, pauli_opt)
+
 
         # Now unflip the qubits, they're a secret
         self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))

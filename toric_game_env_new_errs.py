@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from config import ErrorModel
 
 ### Environment
-class ToricGameEnv(gym.Env):
+class ToricGameEnvNewErrs(gym.Env):
     '''
     ToricGameEnv environment. Effective single player game.
     '''

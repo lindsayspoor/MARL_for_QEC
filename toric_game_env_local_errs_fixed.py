@@ -9,16 +9,17 @@ from gymnasium import spaces
 import gymnasium
 import sys, os
 import matplotlib.pyplot as plt
+from scipy.spatial import distance_matrix
 
 from config import ErrorModel
 
 ### Environment
-class ToricGameEnv(gym.Env):
+class ToricGameEnvLocalFixedErrs(gym.Env):
     '''
     ToricGameEnv environment. Effective single player game.
     '''
 
-    def __init__(self, board_size, error_rate, logical_error_reward, continue_reward, success_reward,error_model, channels, memory):
+    def __init__(self, board_size, num_initial_errors, logical_error_reward, continue_reward, success_reward,error_model, channels, memory):
         """
         Args:
             opponent: Fixed
@@ -28,8 +29,8 @@ class ToricGameEnv(gym.Env):
         self.error_model = error_model
         self.channels = channels
         self.memory = memory
-        self.error_rate = error_rate
-        #self.num_initial_errors = num_initial_errors
+        #self.error_rate = error_rate
+        self.num_initial_errors = num_initial_errors
         self.logical_error_reward=logical_error_reward
         self.continue_reward=continue_reward
         self.success_reward=success_reward
@@ -169,9 +170,9 @@ class ToricGameEnv(gym.Env):
         if pauli_Z_flip:
             self.qubits_flips[1].append(location)
 
-        number_syndromes_before=len(self.state.syndrome_pos)
+
         self.state.act(self.state.qubit_pos[location], pauli_opt)
-        number_syndromes_after=len(self.state.syndrome_pos)
+
 
 
 
@@ -211,26 +212,43 @@ class ToricGameEnv(gym.Env):
         # Probabilitic mode
         # Pick random sites according to error rate
         #for q in np.random.randint(0,len(self.state.qubit_pos), self.num_initial_errors):
+        random_number = np.random.randint(0,len(self.state.qubit_pos), 1)
+        dist_matrix = distance_matrix(self.state.qubit_pos, self.state.qubit_pos)
+        selected_dist_matrix = dist_matrix[random_number]/np.sum(dist_matrix[random_number])
+        probability_matrix = (1-selected_dist_matrix)[0]
+        where_zero = np.argwhere(probability_matrix == np.max(probability_matrix))[0]
+        probability_matrix[where_zero] = 0
+        probability_matrix = probability_matrix / np.sum(probability_matrix)
+        local_distribution = np.random.choice(np.arange(0,len(self.state.qubit_pos)), size =(self.num_initial_errors-1), replace=False, p=probability_matrix )
+        local_distribution = np.append(local_distribution, random_number)
+        for q in local_distribution:
+            if q >= (len(self.state.qubit_pos)-1):
+                q = len(self.state.qubit_pos)-1
+            if q < 0:
+                q = 0
+            q = int(q)
+
         #for q in [4,7,15]:
-        for q in self.state.qubit_pos:    
-        #q = self.state.qubit_pos[q]
-            if np.random.rand() < self.error_rate:
+        #for q in self.state.qubit_pos:    
+            q = self.state.qubit_pos[q]
+
+            #if np.random.rand() < self.error_rate:
             #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
-                if self.error_model == ErrorModel["UNCORRELATED"]:
-                    pauli_opt = 0
-                elif self.error_model == ErrorModel["DEPOLARIZING"]:
-                    pauli_opt = np.random.randint(0,3)
+            if self.error_model == ErrorModel["UNCORRELATED"]:
+                pauli_opt = 0
+            elif self.error_model == ErrorModel["DEPOLARIZING"]:
+                pauli_opt = np.random.randint(0,3)
 
-                pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
-                pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
+            pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
+            pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
 
 
-                if pauli_X_flip:
-                    self.initial_qubits_flips[0].append( q )
-                if pauli_Z_flip:
-                    self.initial_qubits_flips[1].append( q )
+            if pauli_X_flip:
+                self.initial_qubits_flips[0].append( q )
+            if pauli_Z_flip:
+                self.initial_qubits_flips[1].append( q )
 
-                self.state.act(q, pauli_opt)
+            self.state.act(q, pauli_opt)
 
         # Now unflip the qubits, they're a secret
         self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))
