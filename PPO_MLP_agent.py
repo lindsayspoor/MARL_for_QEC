@@ -1,207 +1,227 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from stable_baselines3 import PPO, DQN
-from toric_game_env_new_errs import ToricGameEnvNewErrs
-from toric_game_env import ToricGameEnv
-from toric_game_env_local_errs import ToricGameEnvLocalErrs
-from toric_game_env_fixed_errs import ToricGameEnvFixedErrs
-from toric_game_env_local_errs_fixed import ToricGameEnvLocalFixedErrs
+from stable_baselines3 import PPO
+from toric_game_env import ToricGameEnv, ToricGameEnvLocalErrs, ToricGameEnvFixedErrs, ToricGameEnvLocalFixedErrs
 from config import ErrorModel
-#from perspectives import Perspectives
 from stable_baselines3.ppo.policies import MlpPolicy
-from stable_baselines3.common.evaluation import evaluate_policy
+#from stable_baselines3.common.evaluation import evaluate_policy
+from simulate_MWPM import simulate, plot
 import os
+import torch as th
 os.getcwd()
 
-error_model = ErrorModel['UNCORRELATED']
+def plot_illegal_action_rate(error_rates, illegal_action_rates, path):
+    plt.figure()
+    plt.scatter(error_rates, illegal_action_rates)
+    plt.plot(error_rates, illegal_action_rates, linestyle='-.', linewidth=0.5)
+    plt.title(r'Toric Code - Illegal action rate')
+    plt.xlabel(r'$p_x$')
+    plt.ylabel(r'Illegal actions[\%]')
+    plt.savefig(f'Figure_results/Results_benchmarks/benchmark_MWPM_{path}.pdf')
+    plt.show()
 
 
-#bit-flip only, errormodel='uncorrelated'
-#channels=[0]
+class PPO_agent:
+    def __init__(self, initialisation_settings):#path):
 
-#errormodel='depolarizing -> channels = [0,1]
+        self.initialisation_settings=initialisation_settings
 
-def evaluate_PPO_agent(model, env, number_evaluations, max_moves,logical_error_reward, success_reward,render):
-    removed_syndromes=0
-    moves_all=[]
-    fail=0
-    succes=0
-    for k in range(number_evaluations):
-        obs, info = env.reset()
-        if render:
-            env.render()
-        moves=0
-        for i in range(max_moves):
-            action, _state = model.predict(obs)
-            obs, reward, done, truncated, info = env.step(action, without_illegal_actions=True)
-            moves+=1
-            #rewards+=reward
-            if render:
-                env.render()
-            if done:
-                if reward == logical_error_reward:
-                    print("Game over, logical error!")
-                    fail+=1
-                    moves_all.append(moves)
-                if reward==success_reward:
-                    succes+=1
-                    removed_syndromes+=1
-                    if render:
-                        env.render()
-                    env.reset()
-                    moves_all.append(moves)
-                    moves=0
-                break
+        #INITIALISE MODEL FOR INITIALISATION
+        self.initialise_model()
 
-        #print(f"successfully removed syndromes = {removed_syndromes}")
-        #print(f"total number of moves = {moves}")
-                #break
-
-        #print(rewards)
-        #print(info)
-    mean_removed_syndromes = removed_syndromes/number_evaluations
-    mean_moves = np.mean(moves_all)
-    if ((succes+fail)==0):
-        succes_rate=0
-    else:
-        succes_rate = succes/(succes+fail)
-
-    return mean_removed_syndromes, mean_moves, succes_rate
-
-def train_model(model, random_error_distribution,board_size,total_timesteps, learning_rate,error_rate,logical_error_reward, continue_reward, success_reward):
-
-
-    model.learn(total_timesteps=total_timesteps, progress_bar=True)
-    if random_error_distribution:
-        model.save(f"trained_models/ppo_mlp_random_{total_timesteps}_timestep_board_{board_size}_error_rate_{error_rate}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
-    else:
-        model.save(f"trained_models/ppo_mlp_local_{total_timesteps}_timestep_board_{board_size}_error_rate_{error_rate}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
-    
-    return model
-
-def initialise_model(model, random_error_distribution,board_size,total_timesteps, learning_rate, error_rate,logical_error_reward, continue_reward, success_reward):
-
-    if random_error_distribution:
-        model=PPO.load(f"trained_models/ppo_mlp_random_{total_timesteps}_timestep_board_{board_size}_error_rate_{error_rate}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
-    else:
-        model=PPO.load(f"trained_models/ppo_mlp_local_{total_timesteps}_timestep_board_{board_size}_error_rate_{error_rate}_lr_{learning_rate}_ler_{logical_error_reward}_cr_{continue_reward}_sr_{success_reward}")
-    return model
-
-
-def calculate_success_rates(random_error_distirbution, board_size, error_rates, logical_error_reward, success_reward, continue_reward, learning_rate, total_timesteps, train, number_evaluations, max_moves, render ):
-    success_rates = []
-
-    for error_rate in error_rates:
-        print(f"error rate = {error_rate}")
-
-        if random_error_distirbution:
-            env = ToricGameEnv(board_size, error_rate, logical_error_reward, continue_reward, success_reward,error_model, [0], False)
+    def initialise_model(self):
+        #INITIALISE ENVIRONMENT INITIALISATION
+        print("initialising the environment and model...")
+        if self.initialisation_settings['random_error_distribution']:
+            self.env = ToricGameEnv(self.initialisation_settings)
         else: 
-            env = ToricGameEnvLocalErrs(board_size, error_rate, logical_error_reward, continue_reward, success_reward,error_model, [0], False)
+            self.env = ToricGameEnvLocalErrs(self.initialisation_settings)
+            
+        #INITIALISE MODEL FOR INITIALISATION
+        self.model = PPO(MlpPolicy, self.env, learning_rate=self.initialisation_settings['learning_rate'], verbose=0)
+        print("initialisation done")
+
+    def change_environment_settings(self, settings):
+        print("changing environment settings...")
+        if settings['random_error_distribution']:
+            self.env = ToricGameEnv(settings)
+        else: 
+            self.env = ToricGameEnvLocalErrs(settings)
+        print("changing settings done")
+
+    def train_model(self, save_model_path):
+        print("training the model...")
+        self.model.learn(total_timesteps=self.initialisation_settings['total_timesteps'], progress_bar=True)
+        self.model.save(f"trained_models/ppo_{save_model_path}")
+        print("training done")
+
+    def load_model(self, load_model_path):
+        print("loading the model...")
+        self.model=PPO.load(f"trained_models/ppo_{load_model_path}")
+        print("loading done")
+
+    def evaluate_model(self, evaluation_settings, render, number_evaluations, max_moves):
+        print("evaluating the model...")
+        moves=0
+        logical_errors=0
+        success=0
+        illegal=0
+        for k in range(number_evaluations):
+            obs, info = self.env.reset()
+            if render:
+                self.env.render()
+            for i in range(max_moves):
+                action, _state = self.model.predict(obs)
+                obs, reward, done, truncated, info = self.env.step(action, without_illegal_actions=True)
+                moves+=1
+                if render:
+                    self.env.render()
+                if done:
+                    if reward == evaluation_settings['logical_error_reward']:
+                        print(info['message'])
+                        logical_errors+=1
+                    if reward == evaluation_settings['illegal_action_reward']:
+                        print(info['message'])
+                        illegal+=1
+                    if reward == evaluation_settings['success_reward']:
+                        success+=1
+                        self.env.reset()
+                    break
+            
+        print(f"mean number of moves per evaluation is {moves/number_evaluations}")
         
-
-
-        #EVALUATE PPO/DQN AGENT
-
-        #evaluate un-trained agent
-        model = PPO(MlpPolicy, env, learning_rate=learning_rate, verbose=0)
-        mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=100, warn=False)
-
-        print(f"mean_reward: {mean_reward:.2f} +/- {std_reward:.2f}")
-
-
-        if train:
-            model=train_model(model, random_error_distribution,board_size,total_timesteps, learning_rate, error_rate,logical_error_reward, continue_reward, success_reward)
+        if (success+logical_errors)==0:
+            success_rate = 0
         else:
-            model=initialise_model(model, random_error_distribution,board_size,total_timesteps, learning_rate,error_rate, logical_error_reward, continue_reward, success_reward)
+            success_rate= success / (success+logical_errors)
 
+        illegal_action_rate = (illegal/(success+logical_errors+illegal))
 
-        mean_removed_syndromes, mean_moves, succes_rate = evaluate_PPO_agent(model, env, number_evaluations, max_moves, logical_error_reward, success_reward,render)
+        print("evaluation done")
 
-        success_rates.append(succes_rate)
+        return success_rate, illegal_action_rate
 
-        print(f"mean number of successfully removed syndromes = {mean_removed_syndromes}")
-        print(f"mean total number of moves = {mean_moves}")
-        print(f"error correction succes rate = {succes_rate} ")
+#SET SETTINGS TO INITIALISE AGENT ON
+initialisation_settings = {'board_size': 5,
+            'error_model': ErrorModel['UNCORRELATED'],
+            'error_rate': 0.1,
+            'logical_error_reward': -1000,
+            'success_reward': 1000,
+            'continue_reward':0.0,
+            'illegal_action_reward':-800,
+            'learning_rate':0.0005,
+            'total_timesteps': 3e6,
+            #'with_error_rates': True,
+            'random_error_distribution': True,
+            'action_mask': True,
+            }
 
+#SET SETTINGS TO LOAD TRAINED AGENT ON
+loaded_model_settings = {'board_size': 5,
+            'error_model': ErrorModel['UNCORRELATED'],
+            'error_rate': 0.1,
+            'logical_error_reward': -1000,
+            'success_reward': 1000,
+            'continue_reward':0.0,
+            'illegal_action_reward':-800,
+            'learning_rate':0.0005,
+            'total_timesteps': 3e6,
+            #'with_error_rates': True,
+            'random_error_distribution': True,
+            'action_mask': True,
+            }
 
-        # Evaluate the trained agent
-        mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=100)
+evaluation_settings = {'board_size': 5,
+            'error_model': ErrorModel['UNCORRELATED'],
+            'error_rate': 0.1,
+            'logical_error_reward': -1000,
+            'success_reward': 1000,
+            'continue_reward':0.0,
+            'illegal_action_reward':-800,
+            'learning_rate':0.0005,
+            'total_timesteps': 3e6,
+            #'with_error_rates': True,
+            'random_error_distribution': True,
+            'action_mask': True,
+            }
 
-        print(f"mean_reward:{mean_reward:.2f} +/- {std_reward:.2f}")
-        print(f"PPO N={num_initial_errors}")
+#SETTINGS FOR RUNNING THIS SCRIPT
+train=False
+curriculum=False
+benchmark_MWPM=True
+plot_illegal_actions_rate = True
+save_files=True
+render=False
+number_evaluations=1000
+max_moves=200
+evaluate=True
+
+save_model_path =''
+for key, value in initialisation_settings.items():
+    save_model_path+=f"{key}={value}"
+
+load_model_path =''
+for key, value in loaded_model_settings.items():
+    load_model_path+=f"{key}={value}"
+
+#initialise PPO Agent
+AgentPPO = PPO_agent(initialisation_settings)
+
+if train:
+    AgentPPO.train_model(save_model_path=save_model_path)
+else:
+    AgentPPO.load_model(load_model_path=load_model_path)
+
+p_start = 0.01 
+p_end = 0.20
+error_rates = np.linspace(p_start,p_end,6)
+
+#error_rates=[0.1]
+
+#setting the action mask constraint to False when evaluating so that it is allowed to take any action the agent likes
+evaluation_settings['action_mask']=False
+
+if evaluate:
+    success_rates=[]
+    illegal_action_rates=[]
+    for error_rate in error_rates:
+        #SET SETTINGS TO EVALUATE LOADED AGENT ON
+        print(f"{error_rate=}")
+        evaluation_settings['error_rate'] = error_rate
+
+        AgentPPO.change_environment_settings(evaluation_settings)
+        success_rate, illegal_action_rate = AgentPPO.evaluate_model(evaluation_settings, render, number_evaluations, max_moves)
+        success_rates.append(success_rate)
+        illegal_action_rates.append(illegal_action_rate)
+        print(f"{success_rate=}")
+        print(f"{illegal_action_rate=}")
 
 
     success_rates=np.array(success_rates)
+    illegal_action_rates=np.array(illegal_action_rates)
 
-    if random_error_distirbution:
-        np.savetxt(f"MWPM/files_success_rates/success_rates_ppo_mlp_random_timesteps_{total_timesteps}_lr_{learning_rate}_d_{board_size}_sr_{success_reward}_cr_{continue_reward}_ler_{logical_error_reward}.csv", success_rates, delimiter=',')
-    else:
-        np.savetxt(f"MWPM/files_success_rates/success_rates_ppo_mlp_local_timesteps_{total_timesteps}_lr_{learning_rate}_d_{board_size}_sr_{success_reward}_cr_{continue_reward}_ler_{logical_error_reward}.csv", success_rates, delimiter=',')
-    
-def calculate_result_fixed_errors(random_error_distribution, board_size, num_initial_errors, logical_error_reward, success_reward, continue_reward, learning_rate, total_timesteps, train, number_evaluations, max_moves, render ):
-    #USE FIXED NUMBER OF INITIAL ERRORS HERE
+    evaluation_path=load_model_path
 
-    if random_error_distribution:
-        env = ToricGameEnvFixedErrs(board_size, num_initial_errors, logical_error_reward, continue_reward, success_reward,error_model, [0], False)
-    else:
-        env = ToricGameEnvLocalFixedErrs(board_size, num_initial_errors, logical_error_reward, continue_reward, success_reward,error_model, [0], False)
-    
+    if save_files:
+        np.savetxt(f"Files_results/files_success_rates/success_rates_ppo_{evaluation_path}.csv", success_rates)
 
+simulation_settings = {'decoder': 'MWPM',
+                       'N': 1000,
+                       'delta_p': 0.001,
+                       'p_start': p_start,
+                       'p_end': p_end,
+                       'path': f'Figure_results/Results_benchmarks/benchmark_MWPM_{evaluation_path}.pdf',
+                       'tex_plot' : False,
+                       'save_data' : True,
+                       'plot_all' : True,
+                       'all_L':[5]}
 
-    #EVALUATE PPO/DQN AGENT
+plot_settings = simulation_settings
+plot_settings['all_L']=[5]
 
-    #evaluate un-trained agent
-    model = PPO(MlpPolicy, env, learning_rate=learning_rate, verbose=0)
-    mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=100, warn=False)
+if benchmark_MWPM:
+    sim_data, sim_all_data = simulate(simulation_settings)
+    plot(plot_settings, sim_data, sim_all_data, success_rates, error_rates)
 
-    print(f"mean_reward: {mean_reward:.2f} +/- {std_reward:.2f}")
-
-
-    if train:
-        model=train_model(model, board_size,total_timesteps, learning_rate, num_initial_errors, logical_error_reward, continue_reward, success_reward)
-    else:
-        model=initialise_model(model, board_size,total_timesteps, learning_rate, num_initial_errors, logical_error_reward, continue_reward, success_reward)
-
-
-    mean_removed_syndromes, mean_moves, succes_rate = evaluate_PPO_agent(model, env, number_evaluations, max_moves, logical_error_reward, success_reward,render)
-
-    #success_rates.append(succes_rate)
-
-    print(f"mean number of successfully removed syndromes = {mean_removed_syndromes}")
-    print(f"mean total number of moves = {mean_moves}")
-    print(f"error correction succes rate = {succes_rate} ")
-
-
-    # Evaluate the trained agent
-    mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=100)
-
-    print(f"mean_reward:{mean_reward:.2f} +/- {std_reward:.2f}")
-    print(f"PPO N={num_initial_errors}")
-
-
-#SETTINGS
-board_size = 3
-error_rates=np.linspace(0.05, 0.25, 5)
-#error_rates=[0.2]
-error_rate=0.2
-pauli_opt=0
-num_initial_errors = 3
-logical_error_reward=-1.0
-success_reward=1.0
-continue_reward=0.0
-learning_rate=0.0005
-total_timesteps=1000000
-train=True
-number_evaluations=1000
-max_moves=200
-render=False
-with_error_rates=True
-random_error_distribution = True
-
-
-if with_error_rates:
-    calculate_success_rates(random_error_distribution, board_size, error_rates, logical_error_reward, success_reward, continue_reward, learning_rate, total_timesteps, train, number_evaluations, max_moves, render )
-
-else:
-    calculate_result_fixed_errors(random_error_distribution, board_size, num_initial_errors, logical_error_reward, success_reward, continue_reward, learning_rate, total_timesteps, train, number_evaluations, max_moves, render )
+if plot_illegal_actions_rate:
+    plot_illegal_action_rate(error_rates, illegal_action_rates, evaluation_path)
