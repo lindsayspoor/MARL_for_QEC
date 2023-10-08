@@ -10,14 +10,16 @@ import os
 import torch as th
 os.getcwd()
 
-def plot_illegal_action_rate(error_rates, illegal_action_rates, path):
+def plot_illegal_action_rate(error_rates, illegal_action_rates, path, illegal_action_rewards):
     plt.figure()
-    plt.scatter(error_rates, illegal_action_rates)
-    plt.plot(error_rates, illegal_action_rates, linestyle='-.', linewidth=0.5)
+    for j in range(illegal_action_rates.shape[0]):
+        plt.scatter(error_rates, illegal_action_rates[j,:], label=f'r_ill={illegal_action_rewards[j]}')
+        plt.plot(error_rates, illegal_action_rates[j,:], linestyle='-.', linewidth=0.5)
     plt.title(r'Toric Code - Illegal action rate')
     plt.xlabel(r'$p_x$')
     plt.ylabel(r'Illegal actions[\%]')
-    plt.savefig(f'Figure_results/Results_benchmarks/benchmark_MWPM_{path}.pdf')
+    plt.legend()
+    plt.savefig(f'Figure_results/Results_illegal_actions/benchmark_MWPM_{path}.pdf')
     plt.show()
 
 
@@ -78,10 +80,10 @@ class PPO_agent:
                     self.env.render()
                 if done:
                     if reward == evaluation_settings['logical_error_reward']:
-                        print(info['message'])
+                        #print(info['message'])
                         logical_errors+=1
                     if reward == evaluation_settings['illegal_action_reward']:
-                        print(info['message'])
+                        #print(info['message'])
                         illegal+=1
                     if reward == evaluation_settings['success_reward']:
                         success+=1
@@ -95,14 +97,17 @@ class PPO_agent:
         else:
             success_rate= success / (success+logical_errors)
 
-        illegal_action_rate = (illegal/(success+logical_errors+illegal))
+        if (success+logical_errors+illegal)==0:
+            illegal_action_rate = 0
+        else:
+            illegal_action_rate = (illegal/(success+logical_errors+illegal))
 
         print("evaluation done")
 
         return success_rate, illegal_action_rate
 
 #SET SETTINGS TO INITIALISE AGENT ON
-initialisation_settings = {'board_size': 5,
+initialisation_settings = {'board_size': 3,
             'error_model': ErrorModel['UNCORRELATED'],
             'error_rate': 0.1,
             'logical_error_reward': -1000,
@@ -117,7 +122,7 @@ initialisation_settings = {'board_size': 5,
             }
 
 #SET SETTINGS TO LOAD TRAINED AGENT ON
-loaded_model_settings = {'board_size': 5,
+loaded_model_settings = {'board_size': 3,
             'error_model': ErrorModel['UNCORRELATED'],
             'error_rate': 0.1,
             'logical_error_reward': -1000,
@@ -131,7 +136,7 @@ loaded_model_settings = {'board_size': 5,
             'action_mask': True,
             }
 
-evaluation_settings = {'board_size': 5,
+evaluation_settings = {'board_size': 3,
             'error_model': ErrorModel['UNCORRELATED'],
             'error_rate': 0.1,
             'logical_error_reward': -1000,
@@ -152,76 +157,115 @@ benchmark_MWPM=True
 plot_illegal_actions_rate = True
 save_files=True
 render=False
-number_evaluations=1000
+number_evaluations=10000
 max_moves=200
 evaluate=True
 
-save_model_path =''
-for key, value in initialisation_settings.items():
-    save_model_path+=f"{key}={value}"
+success_rates_all=[]
+illegal_action_rates_all=[]
+illegal_action_rewards=[-999,-800,-500,-100]
+for illegal_action_reward in illegal_action_rewards:
+#success_rewards = [500, 1000, 1500, 2000]
+#logical_error_rewards=[-500, -1000, -1500, -2000]
+#logical_error_rewards=[-1000]
+#success_rewards=[1000]
+#for success_reward in success_rewards:
+#for logical_error_reward in logical_error_rewards:
+    print(f"{illegal_action_reward=}")
+    #print(f"{success_reward=}")
+    #print(f"{logical_error_reward=}")
 
-load_model_path =''
-for key, value in loaded_model_settings.items():
-    load_model_path+=f"{key}={value}"
+    initialisation_settings['illegal_action_reward']=illegal_action_reward
+    loaded_model_settings['illegal_action_reward']=illegal_action_reward
+    #initialisation_settings['logical_error_reward']=logical_error_reward
+    #loaded_model_settings['logical_error_reward']=logical_error_reward
 
-#initialise PPO Agent
-AgentPPO = PPO_agent(initialisation_settings)
+    save_model_path =''
+    for key, value in initialisation_settings.items():
+        save_model_path+=f"{key}={value}"
 
-if train:
-    AgentPPO.train_model(save_model_path=save_model_path)
-else:
-    AgentPPO.load_model(load_model_path=load_model_path)
+    load_model_path =''
+    for key, value in loaded_model_settings.items():
+        load_model_path+=f"{key}={value}"
 
-p_start = 0.01 
-p_end = 0.20
-error_rates = np.linspace(p_start,p_end,6)
+    #initialise PPO Agent
+    AgentPPO = PPO_agent(initialisation_settings)
 
-#error_rates=[0.1]
+    if train:
+        AgentPPO.train_model(save_model_path=save_model_path)
+    else:
+        AgentPPO.load_model(load_model_path=load_model_path)
 
-#setting the action mask constraint to False when evaluating so that it is allowed to take any action the agent likes
-evaluation_settings['action_mask']=False
+    p_start = 0.01 
+    p_end = 0.20
+    error_rates = np.linspace(p_start,p_end,6)
 
-if evaluate:
-    success_rates=[]
-    illegal_action_rates=[]
-    for error_rate in error_rates:
-        #SET SETTINGS TO EVALUATE LOADED AGENT ON
-        print(f"{error_rate=}")
-        evaluation_settings['error_rate'] = error_rate
+    #error_rates=[0.2]
 
-        AgentPPO.change_environment_settings(evaluation_settings)
-        success_rate, illegal_action_rate = AgentPPO.evaluate_model(evaluation_settings, render, number_evaluations, max_moves)
-        success_rates.append(success_rate)
-        illegal_action_rates.append(illegal_action_rate)
-        print(f"{success_rate=}")
-        print(f"{illegal_action_rate=}")
+    #setting the action mask constraint to False when evaluating so that it is allowed to take any action the agent likes
+    #evaluation_settings['action_mask']=False
+
+    if evaluate:
+        success_rates=[]
+        illegal_action_rates=[]
+        for error_rate in error_rates:
+            #SET SETTINGS TO EVALUATE LOADED AGENT ON
+            print(f"{error_rate=}")
+            evaluation_settings['error_rate'] = error_rate
+
+            AgentPPO.change_environment_settings(evaluation_settings)
+            success_rate, illegal_action_rate = AgentPPO.evaluate_model(evaluation_settings, render, number_evaluations, max_moves)
+            success_rates.append(success_rate)
+            illegal_action_rates.append(illegal_action_rate)
+            print(f"{success_rate=}")
+            print(f"{illegal_action_rate=}")
 
 
-    success_rates=np.array(success_rates)
-    illegal_action_rates=np.array(illegal_action_rates)
+        success_rates=np.array(success_rates)
+        illegal_action_rates=np.array(illegal_action_rates)
 
-    evaluation_path=load_model_path
+        evaluation_path =''
+        for key, value in evaluation_settings.items():
+            evaluation_path+=f"{key}={value}"
 
-    if save_files:
-        np.savetxt(f"Files_results/files_success_rates/success_rates_ppo_{evaluation_path}.csv", success_rates)
+        if save_files:
+            np.savetxt(f"Files_results/files_success_rates/success_rates_ppo_{evaluation_path}.csv", success_rates)
 
-simulation_settings = {'decoder': 'MWPM',
-                       'N': 1000,
-                       'delta_p': 0.001,
-                       'p_start': p_start,
-                       'p_end': p_end,
-                       'path': f'Figure_results/Results_benchmarks/benchmark_MWPM_{evaluation_path}.pdf',
-                       'tex_plot' : False,
-                       'save_data' : True,
-                       'plot_all' : True,
-                       'all_L':[5]}
+    success_rates_all.append(success_rates)
+    illegal_action_rates_all.append(illegal_action_rates)
 
-plot_settings = simulation_settings
-plot_settings['all_L']=[5]
 
+    simulation_settings = {'decoder': 'MWPM',
+                        'N': 1000,
+                        'delta_p': 0.001,
+                        'p_start': p_start,
+                        'p_end': p_end,
+                        'path': f'Figure_results/Results_benchmarks/benchmark_MWPM_{evaluation_path}.pdf',
+                        'tex_plot' : False,
+                        'save_data' : True,
+                        'plot_all' : False,
+                        'all_L':[3]}
+
+    plot_settings = simulation_settings
+    plot_settings['all_L']=[3]
+
+success_rates_all=np.array(success_rates_all)
+illegal_action_rates_all=np.array(illegal_action_rates_all)
+
+
+
+#success_rates_1000 = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.1logical_error_reward=-1000success_reward=1000continue_reward=0.0illegal_action_reward=-800learning_rate=0.0005total_timesteps=3000000.0random_error_distribution=Trueaction_mask=True.csv")
+
+#success_rates_all=np.vstack((success_rates_all, success_rates_1000))
+
+
+#illegal_action_rewards.append(-800)
+#success_rewards.append(1000)
+#logical_error_rewards.append(-1000)
 if benchmark_MWPM:
     sim_data, sim_all_data = simulate(simulation_settings)
-    plot(plot_settings, sim_data, sim_all_data, success_rates, error_rates)
+    #plot(plot_settings, sim_data, sim_all_data, success_rates_all, error_rates, logical_error_rewards)
+    plot(plot_settings, sim_data, sim_all_data, success_rates_all, error_rates, illegal_action_rewards)
 
 if plot_illegal_actions_rate:
-    plot_illegal_action_rate(error_rates, illegal_action_rates, evaluation_path)
+    plot_illegal_action_rate(error_rates, illegal_action_rates_all, evaluation_path, illegal_action_rewards)
