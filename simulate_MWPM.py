@@ -85,7 +85,7 @@ def simulate(simulation_settings):
 
     return data, all_data
 
-def plot(plot_settings, data, all_data, success_rates, error_rates, illegal_action_rewards):
+def plot(plot_settings, data, all_data, success_rates, error_rates, error_rates_curriculum):
 
     
     plot_file_name = plot_settings['path'] + plot_settings['decoder'] + '_L=' + ','.join([str(x) for x in plot_settings['all_L']]) + '_N=' + str(
@@ -117,7 +117,8 @@ def plot(plot_settings, data, all_data, success_rates, error_rates, illegal_acti
         plt.errorbar(p_x[all_L[i]], p_corr[all_L[i]], yerr=errorbars[all_L[i]],linestyle='-.', color='black', label=r'$d = ' + str(all_L[i]) + '$' + " MWPM", linewidth = 0.5)
 
         for j in range(success_rates.shape[0]):
-            plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_ill={illegal_action_rewards[j]}", marker="^", s=30)
+            #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_ill={illegal_action_rewards[j]}", marker="^", s=30)
+            plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, p_error={error_rates_curriculum[j]}", marker="^", s=30)
             #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_ill=-800", marker="^", s=30)
             plt.plot(error_rates, success_rates[j,:]*100, linestyle='-.', linewidth=0.5)
     plt.axis([plot_settings['p_start'], plot_settings['p_end'], 0, 100])

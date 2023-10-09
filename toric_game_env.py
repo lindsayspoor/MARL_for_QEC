@@ -296,6 +296,7 @@ class ToricGameEnvLocalErrs(ToricGameEnv):
         # Probabilitic mode
 
         probability_matrix = np.random.rand(len(self.state.qubit_pos))
+        #print(f"{probability_matrix=}")
 
 
         #first choose the first qubit to flip
@@ -310,6 +311,7 @@ class ToricGameEnvLocalErrs(ToricGameEnv):
                 weighted_matrix[where_zero] = 0
                 #multiply with original error rate per qubit
                 probability_matrix =np.multiply(probability_matrix, weighted_matrix)
+                #print(f"{probability_matrix=}")
                 
 
                 q = self.state.qubit_pos[index_qubit]
@@ -329,9 +331,9 @@ class ToricGameEnvLocalErrs(ToricGameEnv):
                     self.initial_qubits_flips[1].append( q )
 
                 self.state.act(q, pauli_opt)
-            break
+            #break
         
-
+        '''
         for i in range(len(probability_matrix)):
             if probability_matrix[i] < self.error_rate:
                 index_qubit = i
@@ -353,7 +355,7 @@ class ToricGameEnvLocalErrs(ToricGameEnv):
                     self.initial_qubits_flips[1].append( q )
 
                 self.state.act(q, pauli_opt)
-
+        '''
 
         # Now unflip the qubits, they're a secret
         self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))

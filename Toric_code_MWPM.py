@@ -70,6 +70,28 @@ def generate_error(grid_s, grid_q, px):
     return grid_s, grid_q
 
 
+def generate_local_error(grid_s, grid_q, px):
+        # loop through all qubits:
+    for row_idx in range(len(grid_q)):
+        for col_idx in range(len(grid_q[0])):
+            error = random() <= px
+            if not error:
+                # nothing has to be changed
+                continue
+            if row_idx % 2 == 0:
+                # above/under stabilizers -> same column
+                stab_row = int(row_idx / 2)
+                grid_s[stab_row][col_idx] += 1  # stabilizer under qubit
+                grid_s[stab_row - 1][col_idx] += 1  # stabilizer above qubit
+            else:
+                # left/right of stabilizers -> same row
+                stab_row = int((row_idx - 1) / 2)
+                grid_s[stab_row][col_idx] += 1  # stabilizer right of qubit
+                grid_s[stab_row][col_idx - 1] += 1  # stabilizer right of qubit
+            grid_q[row_idx][col_idx] += 1
+    return grid_s, grid_q
+
+
 def check_correction(grid_q):
     """(tested for random ones):Check if the correction is correct(no logical X gates)
     input:
