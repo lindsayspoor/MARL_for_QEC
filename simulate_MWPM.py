@@ -1,4 +1,4 @@
-from MWPM_decoder import simulate_MWPM
+from MWPM_decoder import simulate_MWPM, simulate_MWPM_local
 #from Peeling_decoder import simulate_peeling
 #from UF_decoder import simulate_UF
 import matplotlib.pyplot as plt
@@ -28,11 +28,13 @@ def std(n_correct, n_samples):  # standard deviation for errorbars
 def simulate(simulation_settings):
 
 
-    data_filename = 'data_' + simulation_settings['decoder'] + '.txt'
+    data_filename = 'data_' + simulation_settings['decoder'] + f'_random_{simulation_settings["random_errors"]}'+ '.txt'
 
 
-
-    sim_func = simulate_MWPM
+    if simulation_settings['random_errors']:
+        sim_func = simulate_MWPM
+    else:
+        sim_func= simulate_MWPM_local
 
     data = []
     all_px = gen_px_delta(simulation_settings['p_start'], simulation_settings['p_end'], simulation_settings['delta_p'])
@@ -46,7 +48,10 @@ def simulate(simulation_settings):
                 print('progress: ', 100*round(p_idx/len(all_px),3), '%')
             k = 0
             for i in range(simulation_settings['N']):
-                result = sim_func(L, p)
+                if simulation_settings['random_errors']:
+                    result = sim_func(L, p)
+                else:
+                    result = sim_func(L,p, simulation_settings['lambda_value'])
                 if result:
                     k += 1
             if p==0.11:
@@ -85,7 +90,7 @@ def simulate(simulation_settings):
 
     return data, all_data
 
-def plot(plot_settings, data, all_data, success_rates, error_rates, error_rates_curriculum):
+def plot(plot_settings, data, all_data, success_rates, error_rates, success_rewards):
 
     
     plot_file_name = plot_settings['path'] + plot_settings['decoder'] + '_L=' + ','.join([str(x) for x in plot_settings['all_L']]) + '_N=' + str(
@@ -118,7 +123,8 @@ def plot(plot_settings, data, all_data, success_rates, error_rates, error_rates_
 
         for j in range(success_rates.shape[0]):
             #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_ill={illegal_action_rewards[j]}", marker="^", s=30)
-            plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, p_error={error_rates_curriculum[j]}", marker="^", s=30)
+            #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, p_error={error_rates_curriculum[j]}", marker="^", s=30)
+            plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_succ={success_rewards[j]}", marker="^", s=30)
             #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_ill=-800", marker="^", s=30)
             plt.plot(error_rates, success_rates[j,:]*100, linestyle='-.', linewidth=0.5)
     plt.axis([plot_settings['p_start'], plot_settings['p_end'], 0, 100])
@@ -126,7 +132,6 @@ def plot(plot_settings, data, all_data, success_rates, error_rates, error_rates_
     plt.xlabel(r'$p_x$')
     plt.ylabel(r'Correct[\%] $p_s$')
     plt.legend()
-
     plt.savefig(plot_settings['path'])
     plt.show()
 

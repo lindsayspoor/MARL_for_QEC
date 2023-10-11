@@ -1,7 +1,8 @@
 # The basis to simulate the toric code: generate grids, simulate errors, check if correction is complete etc
 
 from random import random
-
+import numpy as np
+from scipy.spatial import distance_matrix
 
 def make_grids(L):
     """TESTED: generate a grid of size LxL
@@ -69,26 +70,65 @@ def generate_error(grid_s, grid_q, px):
             grid_q[row_idx][col_idx] += 1
     return grid_s, grid_q
 
+def qubit_positions(L):
+    qubit_pos=[[x,y] for x in range(2*L) for y in range((x+1)%2, 2*L, 2)]
+    qubit_pos=np.array(qubit_pos).reshape(2*L,L,2)
+    return qubit_pos
 
-def generate_local_error(grid_s, grid_q, px):
-        # loop through all qubits:
+def generate_local_error(grid_s, grid_q, px, L, lambda_value):
+    # loop through all qubits:
+    qubit_pos = qubit_positions(L)
+
     for row_idx in range(len(grid_q)):
         for col_idx in range(len(grid_q[0])):
-            error = random() <= px
-            if not error:
-                # nothing has to be changed
-                continue
-            if row_idx % 2 == 0:
-                # above/under stabilizers -> same column
-                stab_row = int(row_idx / 2)
-                grid_s[stab_row][col_idx] += 1  # stabilizer under qubit
-                grid_s[stab_row - 1][col_idx] += 1  # stabilizer above qubit
-            else:
-                # left/right of stabilizers -> same row
-                stab_row = int((row_idx - 1) / 2)
-                grid_s[stab_row][col_idx] += 1  # stabilizer right of qubit
-                grid_s[stab_row][col_idx - 1] += 1  # stabilizer right of qubit
-            grid_q[row_idx][col_idx] += 1
+            if np.random.rand() < px:
+                if row_idx % 2 == 0:
+                    # above/under stabilizers -> same column
+                    stab_row = int(row_idx / 2)
+                    grid_s[stab_row][col_idx] += 1  # stabilizer under qubit
+                    grid_s[stab_row - 1][col_idx] += 1  # stabilizer above qubit
+                else:
+                    # left/right of stabilizers -> same row
+                    stab_row = int((row_idx - 1) / 2)
+                    grid_s[stab_row][col_idx] += 1  # stabilizer right of qubit
+                    grid_s[stab_row][col_idx - 1] += 1  # stabilizer right of qubit
+                grid_q[row_idx][col_idx] += 1
+
+                qubit=qubit_pos[row_idx,col_idx]
+                qubit_pos_new=qubit_pos.reshape(2*L*L,2)
+                idx_x = np.argwhere(qubit_pos_new[:,0]==qubit[0])
+                idx_y=np.argwhere(qubit_pos_new[idx_x,1]==qubit[1])
+                index_qubit=idx_x[idx_y[0][0]][0]
+
+
+                dist_matrix=distance_matrix(qubit_pos_new, qubit_pos_new)
+                selected_dist_matrix=dist_matrix[index_qubit]/np.sum(dist_matrix[index_qubit])
+                weighted_matrix = (1-selected_dist_matrix)
+                where_zero = np.argwhere(weighted_matrix == np.max(weighted_matrix))[0]
+                weighted_matrix[where_zero] = 0
+
+                for row_2_idx in range(len(grid_q)):
+                    for col_2_idx in range(len(grid_q[0])):
+                        qubit_2=qubit_pos[row_idx,col_idx]
+                        qubit_pos_new=qubit_pos.reshape(2*L*L,2)
+                        idx_x_2 = np.argwhere(qubit_pos_new[:,0]==qubit_2[0])
+                        idx_y_2=np.argwhere(qubit_pos_new[idx_x_2,1]==qubit_2[1])
+                        index_second_qubit=idx_x[idx_y_2[0][0]][0]
+                        if np.random.rand()*np.exp(-weighted_matrix[index_second_qubit]/lambda_value) < px:
+                            if row_2_idx % 2 == 0:
+                                # above/under stabilizers -> same column
+                                stab_row = int(row_2_idx / 2)
+                                grid_s[stab_row][col_2_idx] += 1  # stabilizer under qubit
+                                grid_s[stab_row - 1][col_2_idx] += 1  # stabilizer above qubit
+                            else:
+                                # left/right of stabilizers -> same row
+                                stab_row = int((row_2_idx - 1) / 2)
+                                grid_s[stab_row][col_2_idx] += 1  # stabilizer right of qubit
+                                grid_s[stab_row][col_2_idx - 1] += 1  # stabilizer right of qubit
+                            grid_q[row_2_idx][col_2_idx] += 1
+                        break
+
+
     return grid_s, grid_q
 
 

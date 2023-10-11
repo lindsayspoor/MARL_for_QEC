@@ -108,3 +108,29 @@ def simulate_MWPM(L,px):
     # check if decoding worked
     check = check_correction(matched_error_grid)
     return check[0]
+
+def simulate_MWPM_local(L,px, lambda_value):
+    """Simulate the toric code with the MWPM decoder, and return the result
+    Input:
+        L: grid size
+        px: probability on an X error (0<=px<=1)
+    Output:
+        True if correction correct
+        False if correction gives logical error
+    """
+    #make the grids and generate the error
+    g, q = make_grids(L)
+    g_errors, q_errors = generate_local_error(g, q, px,  L, lambda_value)
+
+    # get the graph from the stabilizer grid
+    path_lengths = calc_path_lengths(g_errors)
+    G = nx.Graph()
+    for edge in path_lengths:
+        G.add_edge(edge[0], edge[1], weight=-edge[2])
+    # decode
+    matching = nx.algorithms.matching.max_weight_matching(G, maxcardinality=True)
+    matched_error_grid = matching_to_path(matching, q_errors)
+
+    # check if decoding worked
+    check = check_correction(matched_error_grid)
+    return check[0]
