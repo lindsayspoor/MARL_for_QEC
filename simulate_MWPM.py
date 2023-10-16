@@ -4,6 +4,7 @@ from MWPM_decoder import simulate_MWPM, simulate_MWPM_local
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import numpy as np
+from intersect import intersection
 
 
 
@@ -54,10 +55,6 @@ def simulate(simulation_settings):
                     result = sim_func(L,p, simulation_settings['lambda_value'])
                 if result:
                     k += 1
-            if p==0.11:
-                print(k)
-            if p==0.167:
-                print(k)
             data.append([L, p, k, simulation_settings['N']])
 
 
@@ -90,7 +87,7 @@ def simulate(simulation_settings):
 
     return data, all_data
 
-def plot(plot_settings, data, all_data, success_rates, error_rates, success_rewards):
+def plot(plot_settings, data, all_data, success_rates, error_rates, continue_rewards):
 
     
     plot_file_name = plot_settings['path'] + plot_settings['decoder'] + '_L=' + ','.join([str(x) for x in plot_settings['all_L']]) + '_N=' + str(
@@ -124,9 +121,52 @@ def plot(plot_settings, data, all_data, success_rates, error_rates, success_rewa
         for j in range(success_rates.shape[0]):
             #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_ill={illegal_action_rewards[j]}", marker="^", s=30)
             #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, p_error={error_rates_curriculum[j]}", marker="^", s=30)
-            plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_succ={success_rewards[j]}", marker="^", s=30)
+            plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_move={continue_rewards[j]}", marker="^", s=30)
             #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_ill=-800", marker="^", s=30)
             plt.plot(error_rates, success_rates[j,:]*100, linestyle='-.', linewidth=0.5)
+    plt.axis([plot_settings['p_start'], plot_settings['p_end'], 0, 100])
+    plt.title(r'Toric Code - ' + plot_settings['decoder'])
+    plt.xlabel(r'$p_x$')
+    plt.ylabel(r'Correct[\%] $p_s$')
+    plt.legend()
+    plt.savefig(plot_settings['path'])
+    plt.show()
+
+
+
+
+def plot_threshold(plot_settings, all_data):
+
+    
+    plot_file_name =plot_settings['path'] + plot_settings['decoder'] + '_L=' + ','.join([str(x) for x in plot_settings['all_L']]) + '_N=' + str(
+    plot_settings['N']) + 'p_start=' + str(plot_settings['p_start']).replace('.', ',') + 'p_end=' + str(plot_settings['p_end']).replace('.', ',') + '.pdf'
+    all_L = plot_settings['all_L']
+
+    if plot_settings['plot_all']:
+        plot_data = all_data
+    else:
+        plot_data = data
+    if plot_settings['tex_plot']:
+        file_name = 'tex' + plot_file_name
+        plt.rc('text', usetex=True)
+    p_x = defaultdict(list)
+    p_corr = defaultdict(list)
+    errorbars = defaultdict(list)
+    for el in plot_data:
+        L = el[0]
+        p_c = el[2] / el[3]
+        p_x[L].append(el[1])
+        p_corr[L].append(100*p_c)
+        errorbars[L].append(std(el[2], el[3]))
+
+
+    # plotting: 
+    plt.figure()
+    x,y= intersection(p_x[all_L[0]],p_corr[all_L[0]],p_x[all_L[-1]],p_corr[all_L[-1]])
+    print(f"{x=},{y=}")
+    for i in range(len(all_L)):
+        plt.errorbar(p_x[all_L[i]], p_corr[all_L[i]], yerr=errorbars[all_L[i]],linestyle='-.', label=r'$d = ' + str(all_L[i]) + '$' + " MWPM", linewidth = 0.5)
+    plt.plot(x[0], y[0], "*k")
     plt.axis([plot_settings['p_start'], plot_settings['p_end'], 0, 100])
     plt.title(r'Toric Code - ' + plot_settings['decoder'])
     plt.xlabel(r'$p_x$')

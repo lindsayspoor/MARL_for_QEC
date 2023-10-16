@@ -82,7 +82,9 @@ class PPO_agent:
                 self.env.render()
             for i in range(max_moves):
                 action_masks=get_action_masks(self.env)
+                #print(f"{action_masks=}")
                 action, _state = self.model.predict(obs, action_masks=action_masks)
+                #print(f"{action=}")
                 obs, reward, done, truncated, info = self.env.step(action, without_illegal_actions=True)
                 moves+=1
                 if render:
@@ -124,18 +126,18 @@ curriculum=False
 benchmark_MWPM=True
 save_files=True
 render=False
-number_evaluations=1000
+number_evaluations=10000
 max_moves=200
 evaluate=True
 
 board_size=5
-error_rate=0.1
+error_rate=0.01
 logical_error_reward=-1000
-success_reward=1000
-continue_reward=0.0
+success_reward=100
+continue_reward=-10
 illegal_action_reward=-1000
-total_timesteps=6e6
-random_error_distribution=False
+total_timesteps=3e6
+random_error_distribution=True
 mask_actions=True
 lambda_value=1
 
@@ -190,21 +192,21 @@ success_rates_all=[]
 #illegal_action_rates_all=[]
 #error_rates_curriculum=np.arange(0.1, 0.2, 0.05)[1:]
 #error_rates_curriculum=[0.1]
-error_rate_curriculum=0.1
+error_rate_curriculum=0.01
 #for error_rate_curriculum in error_rates_curriculum:
 #logical_error_rewards=[-500, -1000, -1500, -2000]
 #logical_error_rewards=[-1000]
 #success_rewards=[500, 800, 1000, 2000]
-success_rewards=[1000]
-for success_reward in success_rewards:
+continue_rewards=[-10]
+for continue_reward in continue_rewards:
 #for logical_error_reward in logical_error_rewards:
-    print(f"{success_reward=}")
+    print(f"{continue_reward=}")
     #print(f"{logical_error_reward=}")
 
     #initialisation_settings['logical_error_reward']=logical_error_reward
     #loaded_model_settings['logical_error_reward']=logical_error_reward
-    initialisation_settings['success_reward']=success_reward
-    loaded_model_settings['success_reward']=success_reward
+    initialisation_settings['continue_reward']=continue_reward
+    loaded_model_settings['continue_reward']=continue_reward
 
     save_model_path =''
     for key, value in initialisation_settings.items():
@@ -311,7 +313,7 @@ if benchmark_MWPM:
     sim_data, sim_all_data = simulate(simulation_settings)
     #plot(plot_settings, sim_data, sim_all_data, success_rates_all, error_rates, logical_error_rewards)
     #plot(plot_settings, sim_data, sim_all_data, success_rates_all, error_rates, error_rates_curriculum)
-    plot(plot_settings, sim_data, sim_all_data, success_rates_all, error_rates, success_rewards)
+    plot(plot_settings, sim_data, sim_all_data, success_rates_all, error_rates, continue_rewards)
 
 #if plot_illegal_actions_rate:
 #    plot_illegal_action_rate(error_rates, illegal_action_rates_all, evaluation_path, error_rates_curriculum)
