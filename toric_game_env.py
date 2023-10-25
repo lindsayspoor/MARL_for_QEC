@@ -39,6 +39,7 @@ class ToricGameEnv(gym.Env):
         self.mask_actions=settings['mask_actions']
         self.illegal_action_reward = -1000#settings['illegal_action_reward']
         self.lambda_value = settings['lambda_value']
+        self.N = settings['N']
 
         # Keep track of the moves
         self.qubits_flips = [[],[]]
@@ -60,21 +61,28 @@ class ToricGameEnv(gym.Env):
         return [seed1, seed2]
 
     def action_masks(self):
-        self.action_masks_list = []
-        action_mask=[]
+        #self.action_masks_list = []
+        #action_mask=[]
+        self.action_masks_list=np.zeros((len(self.state.qubit_pos)))
+        self.action_masks_list[:]=False
         for i in self.state.syndrome_pos:
             a,b = i[0],i[1]
             mask_coords = [[(a-1)%(2*self.state.size),b%(2*self.state.size)],[a%(2*self.state.size),(b-1)%(2*self.state.size)],[a%(2*self.state.size),(b+1)%(2*self.state.size)],[(a+1)%(2*self.state.size),b%(2*self.state.size)]]
             for j in mask_coords:
                 qubit_number = self.state.qubit_pos.index(j)
-                action_mask.append(qubit_number)
-
+                self.action_masks_list[qubit_number]=True
+                #action_mask.append(qubit_number)
+        '''
         action_mask = list(set(action_mask))
         for i in range(len(self.state.qubit_pos)):
             if i in action_mask:
                 self.action_masks_list.append(True)
             else:
                 self.action_masks_list.append(False)
+        '''
+
+
+        self.action_masks_list=list(self.action_masks_list)
         return self.action_masks_list
         #self.mask_qubits.append(qubit_number)
         #self.action_mask = list(set(self.action_mask))
@@ -156,7 +164,7 @@ class ToricGameEnv(gym.Env):
         plt.axis('off')
         plt.show()
 
-    def step(self, location,  without_illegal_actions=False):
+    def step(self, location,  without_illegal_actions=True):
         '''
         Args:
             location: coord of the qubit to flip
@@ -185,13 +193,14 @@ class ToricGameEnv(gym.Env):
             if location not in self.mask_qubits:
                 return self.state.encode(self.channels, self.memory), self.illegal_action_reward, True, False,{'state': self.state, 'message': "illegal_action"}
         '''
-        #'''
+
         if not without_illegal_actions:
             if pauli_X_flip and location in self.qubits_flips[0]:
                 return self.state.encode(self.channels, self.memory), self.illegal_action_reward, True, False,{'state': self.state, 'message': "illegal_action"}
             if pauli_Z_flip and location in self.qubits_flips[1]:
                 return self.state.encode(self.channels, self.memory), self.illegal_action_reward, True, False,{'state': self.state, 'message': "illegal_action"}
-        #'''
+        
+
 
         if pauli_X_flip:
             self.qubits_flips[0].append(location)
@@ -262,16 +271,19 @@ class ToricGameEnv(gym.Env):
         self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))
 
 class ToricGameEnvFixedErrs(ToricGameEnv):
-    def __init__(self, board_size, error_rate, logical_error_reward, continue_reward, success_reward, illegal_action_reward, error_model, channels, memory, num_initial_errors, action_mask):
-        super().__init__(board_size, error_rate, logical_error_reward, continue_reward, success_reward,illegal_action_reward, error_model, channels, memory, num_initial_errors, action_mask)
+    def __init__(self, settings):
+        super().__init__(settings)
         
 
     def _set_initial_errors(self):
         ''' Set random initial errors with an %error_rate rate
             but report only the syndrome
         '''
-        # Probabilitic mode
-        for q in np.random.randint(0,len(self.state.qubit_pos), self.num_initial_errors):   
+        # Probabilistic mode
+        for q in np.random.randint(0,len(self.state.qubit_pos), self.N): 
+        #for q in [38, 39]:
+            #q = 23
+            #q = np.random.choice([21, 15, 46, 19, 25, 26, 14],1)[0] 
             q = self.state.qubit_pos[q]
             #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
             if self.error_model == ErrorModel["UNCORRELATED"]:
@@ -289,7 +301,7 @@ class ToricGameEnvFixedErrs(ToricGameEnv):
                 self.initial_qubits_flips[1].append( q )
 
             self.state.act(q, pauli_opt)
-
+            #break
         # Now unflip the qubits, they're a secret
         self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))
 
