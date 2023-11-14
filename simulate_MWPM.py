@@ -120,7 +120,7 @@ def plot(plot_settings, data, all_data, success_rates, error_rates, error_rates_
 
         for j in range(success_rates.shape[0]):
             #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, reward_scheme={j}", marker="^", s=30)
-            plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, error=4", marker="^", s=30)
+            plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, N={error_rates_curriculum[j]}", marker="^", s=30)
             #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_move={continue_rewards[j]}", marker="^", s=30)
             #plt.scatter(error_rates, success_rates[j,:]*100, label=f"d={all_L[i]} PPO agent, r_ill=-800", marker="^", s=30)
             plt.plot(error_rates, success_rates[j,:]*100, linestyle='-.', linewidth=0.5)

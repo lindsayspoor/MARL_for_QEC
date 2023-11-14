@@ -68,6 +68,7 @@ def generate_error(grid_s, grid_q, px):
                 grid_s[stab_row][col_idx] += 1  # stabilizer right of qubit
                 grid_s[stab_row][col_idx - 1] += 1  # stabilizer right of qubit
             grid_q[row_idx][col_idx] += 1
+    
     return grid_s, grid_q
 
 def qubit_positions(L):

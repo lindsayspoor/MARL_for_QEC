@@ -95,7 +95,7 @@ simulation_settings = {'decoder': 'MWPM',
                     'delta_p': 0.001,
                     'p_start': p_start,
                     'p_end': p_end,
-                    'path': f'Figure_results/Results_benchmarks/benchmark_MWPM_success_rates_0.01_0.05_0.75_{evaluation_path}.pdf',
+                    'path': f'Figure_results/Results_benchmarks/benchmark_MWPM_success_rates_error_rates.pdf',
                     'tex_plot' : False,
                     'save_data' : True,
                     'plot_all' : True,
@@ -108,21 +108,20 @@ plot_settings = simulation_settings
 plot_settings['all_L']=[board_size]
 
 
-success_rates_all = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=3000000.0random_error_distribution=Truemask_actions=Truelambda_value=1_0.01.csv")
+success_rates_all = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=300000random_error_distribution=Truemask_actions=Truelambda_value=1fixed=FalseN=1_0.01.csv")
 #success_rates_all=np.vstack((success_rates_all, success_rates_all))
 
-success_rates_005 = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=3000000.0random_error_distribution=Truemask_actions=Truelambda_value=1_0.05.csv")
-success_rates_all=np.vstack((success_rates_all, success_rates_005))
-success_rates_0075 = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=3000000.0random_error_distribution=Truemask_actions=Truelambda_value=1_0.075.csv")
-success_rates_all=np.vstack((success_rates_all, success_rates_0075))
-
-error_rates_curriculum=[]
-#success_rewards.append(1000)
-#logical_error_rewards.append(-1000)
-error_rates_curriculum.append(0.01)
-#error_rates_curriculum.append(0.025)
-error_rates_curriculum.append(0.05)
-error_rates_curriculum.append(0.075)
+success_rates = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=300000random_error_distribution=Truemask_actions=Truelambda_value=1fixed=FalseN=1_0.048.csv")
+success_rates_all=np.vstack((success_rates_all, success_rates))
+success_rates = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=300000random_error_distribution=Truemask_actions=Truelambda_value=1fixed=FalseN=1_0.086.csv")
+success_rates_all=np.vstack((success_rates_all, success_rates))
+success_rates = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=300000random_error_distribution=Truemask_actions=Truelambda_value=1fixed=FalseN=1_0.12399999999999999.csv")
+success_rates_all=np.vstack((success_rates_all, success_rates))
+success_rates = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=300000random_error_distribution=Truemask_actions=Truelambda_value=1fixed=FalseN=1_0.162.csv")
+success_rates_all=np.vstack((success_rates_all, success_rates))
+success_rates = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=300000random_error_distribution=Truemask_actions=Truelambda_value=1fixed=FalseN=1_0.2.csv")
+success_rates_all=np.vstack((success_rates_all, success_rates))
+error_rates_curriculum=np.linspace(0.01,0.20,6)
 
 #reward scheme = 0 = new reward settings, reward scheme = 1 = old settings
 if benchmark_MWPM:

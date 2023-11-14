@@ -14,12 +14,12 @@ simulation_settings = {'decoder': 'MWPM',
                     'tex_plot' : False,
                     'save_data' : True,
                     'plot_all' : True,
-                    'all_L':[3,5,7,15],
-                    'random_errors':False,
+                    'all_L':[5],
+                    'random_errors':True,
                     'lambda_value':lambda_value}
 
 plot_settings = simulation_settings
-plot_settings['all_L']=[3,5,7,15]
+plot_settings['all_L']=[5]
 
 #sim_all_data = np.loadtxt("data_MWPM_random_True.txt")
 
