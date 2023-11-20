@@ -44,7 +44,7 @@ def plot_benchmark_MWPM(success_rates_all, success_rates_all_MWPM, error_rates, 
     plt.ylabel(r'Correct[\%] $p_s$')
     plt.legend()
     plt.savefig(path_plot)
-    plt.show()
+    #plt.show()
 
 class SaveOnBestTrainingRewardCallback(BaseCallback):
     """
@@ -133,8 +133,9 @@ class PPO_agent:
             
         #INITIALISE MODEL FOR INITIALISATION
         #self.model = PPO(MlpPolicy, self.env, learning_rate=self.initialisation_settings['learning_rate'], verbose=0)
-        self.model = MaskablePPO(MaskableActorCriticPolicy, self.env, learning_rate=self.initialisation_settings['learning_rate'], verbose=0)
+        self.model = MaskablePPO(MaskableActorCriticPolicy, self.env, learning_rate=self.initialisation_settings['learning_rate'], verbose=0, policy_kwargs={"net_arch":dict(pi=[64, 64, 32,16], vf=[64, 64, 32,16])})
         print("initialisation done")
+        print(self.model.policy)
 
     def change_environment_settings(self, settings):
         print("changing environment settings...")
@@ -206,6 +207,115 @@ class PPO_agent:
         plt.ylabel("Rewards")
         plt.title(title + " Smoothed")
         plt.savefig(f'Figure_results/Results_reward_logs/learning_curve_{save_model_path}.pdf')
+        #plt.show()
+
+
+    def render(self, obs0_k,evaluation_settings, actions_k, initial_flips_k):
+        size=evaluation_settings['board_size']
+        qubit_pos   = [[x,y] for x in range(2*size) for y in range((x+1)%2, 2*size, 2)]
+        plaquet_pos = [[x,y] for x in range(1,2*size,2) for y in range(1,2*size,2)]
+
+
+        fig, (ax3,ax1,ax2) = plt.subplots(1,3, figsize=(15,5))
+        a=1/(2*size)
+
+        for i, p in enumerate(plaquet_pos):
+            if obs0_k.flatten()[i]==1:
+
+                fc='darkorange'
+                plaq = plt.Polygon([[a*p[0], a*(p[1]-1)], [a*(p[0]+1), a*(p[1])], [a*p[0], a*(p[1]+1)], [a*(p[0]-1), a*p[1]] ], fc=fc)
+                ax1.add_patch(plaq)
+
+        for i, p in enumerate(plaquet_pos):
+            if obs0_k.flatten()[i]==1:
+
+                fc='darkorange'
+                plaq = plt.Polygon([[a*p[0], a*(p[1]-1)], [a*(p[0]+1), a*(p[1])], [a*p[0], a*(p[1]+1)], [a*(p[0]-1), a*p[1]] ], fc=fc)
+                ax2.add_patch(plaq)
+
+        for i, p in enumerate(plaquet_pos):
+            if obs0_k.flatten()[i]==1:
+
+                fc='darkorange'
+                plaq = plt.Polygon([[a*p[0], a*(p[1]-1)], [a*(p[0]+1), a*(p[1])], [a*p[0], a*(p[1]+1)], [a*(p[0]-1), a*p[1]] ], fc=fc)
+                ax3.add_patch(plaq)
+
+        # Draw lattice
+        for x in range(size):
+            for y in range(size):
+                pos=(2*a*x, 2*a*y)
+                width=a*2
+                lattice = plt.Rectangle( pos, width, width, fc='none', ec='black' )
+                ax1.add_patch(lattice)
+
+        for x in range(size):
+            for y in range(size):
+                pos=(2*a*x, 2*a*y)
+                width=a*2
+                lattice = plt.Rectangle( pos, width, width, fc='none', ec='black' )
+                ax2.add_patch(lattice)
+
+        for x in range(size):
+            for y in range(size):
+                pos=(2*a*x, 2*a*y)
+                width=a*2
+                lattice = plt.Rectangle( pos, width, width, fc='none', ec='black' )
+                ax3.add_patch(lattice)
+
+        for i, p in enumerate(qubit_pos):
+            pos=(a*p[0], a*p[1])
+            fc1='darkgrey'
+            if i in list(actions_k[:,0]):
+                fc1 = 'darkblue'
+
+
+            circle1 = plt.Circle( pos , radius=a*0.25, ec='k', fc=fc1)
+            ax1.add_patch(circle1)
+            ax1.annotate(str(i), pos, fontsize=8, ha="center")
+        
+        for i, p in enumerate(qubit_pos):
+            pos=(a*p[0], a*p[1])
+            fc2='darkgrey'
+            if i in list(actions_k[:,1]):
+                fc2 = 'red'
+
+
+            circle2 = plt.Circle( pos , radius=a*0.25, ec='k', fc=fc2)
+            ax2.add_patch(circle2)
+            ax2.annotate(str(i), pos, fontsize=8, ha="center")
+
+        for i, p in enumerate(qubit_pos):
+            pos=(a*p[0], a*p[1])
+            fc3='darkgrey'
+            if p in list(initial_flips_k)[0]:
+                fc3 = 'magenta'
+
+
+            circle3 = plt.Circle( pos , radius=a*0.25, ec='k', fc=fc3)
+            ax3.add_patch(circle3)
+            ax3.annotate(str(i), pos, fontsize=8, ha="center")
+
+        ax1.set_xlim([-.1,1.1])
+        ax1.set_ylim([-.1,1.1])
+        ax1.set_aspect(1)
+        ax1.set_xticks([])
+        ax1.set_yticks([])
+        ax1.set_title("actions agent")
+        ax2.set_xlim([-.1,1.1])
+        ax2.set_ylim([-.1,1.1])
+        ax2.set_aspect(1)
+        ax2.set_xticks([])
+        ax2.set_yticks([])
+        ax2.set_title("actions MWPM")
+        ax1.axis('off')
+        ax2.axis('off')
+        ax3.set_xlim([-.1,1.1])
+        ax3.set_ylim([-.1,1.1])
+        ax3.set_aspect(1)
+        ax3.set_xticks([])
+        ax3.set_yticks([])
+        ax3.set_title("initial qubit flips")
+        ax3.axis('off')
         plt.show()
 
     def evaluate_model(self, evaluation_settings, render, number_evaluations, max_moves, check_fails):
@@ -231,10 +341,9 @@ class PPO_agent:
             obs0_k=obs0.reshape((evaluation_settings['board_size'],evaluation_settings['board_size']))
 
             MWPM_check, MWPM_actions = self.decode_MWPM_method(obs0_k, initial_flips, evaluation_settings)
-            print(f"{MWPM_actions=}")
-            print(f"{MWPM_actions[:,0]=}")
+
             actions[k,:MWPM_actions.shape[0],1] = MWPM_actions[:,0]
-            print(f"{actions=}")
+
             if MWPM_check==True:
                 success_MWPM+=1
                 results[k,1]=1 #1 for success
@@ -257,9 +366,11 @@ class PPO_agent:
                 if done:
                     if reward == evaluation_settings['logical_error_reward']:
                         if check_fails:
-                            print(info['message'])
-                            print(obs0)
-                            #self.env.render()
+                            if results[k,0]==0 and results[k,1]==1:
+
+                                print(info['message'])
+
+                                self.render(obs0_k,evaluation_settings, actions[k,:,:], initial_flips)
                         logical_errors+=1
                         results[k,0]=0 #0 for fail
                     if reward == evaluation_settings['success_reward']:
@@ -269,8 +380,7 @@ class PPO_agent:
                         self.env.reset()
                     break
 
-            print(f"{actions}")
-            exit()
+
 
                     
             
@@ -288,7 +398,7 @@ class PPO_agent:
 
         print("evaluation done")
 
-        return success_rate, success_rate_MWPM, observations
+        return success_rate, success_rate_MWPM, observations, results, actions
 
     def matching_to_path(self,matchings, grid_q):
 
@@ -442,7 +552,7 @@ class PPO_agent:
             evaluation_settings['fixed'] = evaluate_fixed
             evaluation_settings['N']=N_evaluate
             self.change_environment_settings(evaluation_settings)
-            success_rate, success_rate_MWPM, observations = self.evaluate_model(evaluation_settings, render, number_evaluations, max_moves, check_fails)
+            success_rate, success_rate_MWPM, observations, results, actions = self.evaluate_model(evaluation_settings, render, number_evaluations, max_moves, check_fails)
             success_rates.append(success_rate)
             success_rates_MWPM.append(success_rate_MWPM)
             observations_all.append(observations)
@@ -463,15 +573,21 @@ class PPO_agent:
 
         if save_files:
             if fixed:
-                np.savetxt(f"Files_results/files_success_rates/success_rates_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", success_rates)
+                np.savetxt(f"Files_results/success_rates_agent/success_rates_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", success_rates)
                 np.savetxt(f"Files_results/success_rates_MWPM/success_rates_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", success_rates_MWPM)
                 np.savetxt(f"Files_results/observations/observations_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", observations)
+                np.savetxt(f"Files_results/results_agent_MWPM/results_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", results)
+                np.savetxt(f"Files_results/actions_agent_MWPM/actions_agent_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", actions[:,:,0])
+                np.savetxt(f"Files_results/actions_agent_MWPM/actions_MWPM_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", actions[:,:,1])
             else:
-                np.savetxt(f"Files_results/files_success_rates/success_rates_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", success_rates)
+                np.savetxt(f"Files_results/success_rates_agent/success_rates_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", success_rates)
                 np.savetxt(f"Files_results/success_rates_MWPM/success_rates_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", success_rates_MWPM)
                 np.savetxt(f"Files_results/observations/observations_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", observations)
+                np.savetxt(f"Files_results/results_agent_MWPM/results_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", results)
+                np.savetxt(f"Files_results/actions_agent_MPWM/actions_agent_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", actions[:,:,0])
+                np.savetxt(f"Files_results/actions_agent_MPWM/actions_MWPM_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", actions[:,:,1])
 
-        return success_rates, success_rates_MWPM,observations
+        return success_rates, success_rates_MWPM,observations, results, actions
     
 
     def evaluate_error_rates(self,evaluation_settings, error_rates, render, number_evaluations, max_moves, check_fails, save_files, fixed):
@@ -486,7 +602,7 @@ class PPO_agent:
             evaluation_settings['fixed'] = evaluate_fixed
 
             self.change_environment_settings(evaluation_settings)
-            success_rate, success_rate_MWPM, observations = self.evaluate_model(evaluation_settings, render, number_evaluations, max_moves, check_fails)
+            success_rate, success_rate_MWPM, observations, results, actions = self.evaluate_model(evaluation_settings, render, number_evaluations, max_moves, check_fails)
             success_rates.append(success_rate)
             success_rates_MWPM.append(success_rate_MWPM)
             observations_all.append(observations)
@@ -507,20 +623,26 @@ class PPO_agent:
 
         if save_files:
             if fixed:
-                np.savetxt(f"Files_results/files_success_rates/success_rates_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", success_rates)
+                np.savetxt(f"Files_results/success_rates_agent/success_rates_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", success_rates)
                 np.savetxt(f"Files_results/success_rates_MWPM/success_rates_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", success_rates_MWPM)
                 np.savetxt(f"Files_results/observations/observations_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", observations)
+                np.savetxt(f"Files_results/results_agent_MWPM/results_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", results)
+                np.savetxt(f"Files_results/actions_agent_MWPM/actions_agent_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", actions[:,:,0])
+                np.savetxt(f"Files_results/actions_agent_MWPM/actions_MWPM_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", actions[:,:,1])
             else:
-                np.savetxt(f"Files_results/files_success_rates/success_rates_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", success_rates)
+                np.savetxt(f"Files_results/success_rates_agent/success_rates_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", success_rates)
                 np.savetxt(f"Files_results/success_rates_MWPM/success_rates_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", success_rates_MWPM)
                 np.savetxt(f"Files_results/observations/observations_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", observations)
+                np.savetxt(f"Files_results/results_agent_MWPM/results_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", results)
+                np.savetxt(f"Files_results/actions_agent_MPWM/actions_agent_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", actions[:,:,0])
+                np.savetxt(f"Files_results/actions_agent_MPWM/actions_MWPM_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", actions[:,:,1])
 
-        return success_rates, success_rates_MWPM, observations
+        return success_rates, success_rates_MWPM,observations, results, actions
 
 
 
 #SETTINGS FOR RUNNING THIS SCRIPT
-train=False
+train=True
 curriculum=False
 benchmark_MWPM=False
 save_files=True
@@ -533,19 +655,19 @@ check_fails=False
 board_size=5
 error_rate=0.01
 ent_coef=0.0
-logical_error_reward=5
-success_reward=10
+logical_error_reward=0
+success_reward=50
 continue_reward=-1
 illegal_action_reward=-1000
-total_timesteps=600000
+total_timesteps=200000
 random_error_distribution=True
 mask_actions=True
-log = False
+log = True
 lambda_value=1
 fixed=True
 evaluate_fixed=True
-N_evaluate=4
-N=4
+N_evaluate=1
+N=1
 
 
 #SET SETTINGS TO INITIALISE AGENT ON
@@ -609,15 +731,16 @@ success_rates_all_MWPM=[]
 #error_rates_curriculum=list(np.linspace(0.01,0.20,6))[1:]
 #error_rates_curriculum=[0.01]
 #N_curriculums=[1,2,3,4,5,6,7,8,9,10]
-N_curriculums=[4]
+#N_curriculums=[5]
+N_curriculums=[1,2,3,4,5]
 #N_curriculums=[1,2,3,4,5,6,7,8,9,10]
 
 #for error_rate_curriculum in error_rates_curriculum:
 for N_curriculum in N_curriculums:
     
-    #if N_curriculum>1:
-        #train=False
-        #curriculum=True
+    if N_curriculum>1:
+        train=False
+        curriculum=True
     #initialisation_settings['error_rate']=error_rate_curriculum
     #loaded_model_settings['error_rate']=error_rate_curriculum
     #initialisation_settings['N']=N_curriculum
@@ -668,16 +791,16 @@ for N_curriculum in N_curriculums:
     p_end = 0.20
     error_rates = np.linspace(p_start,p_end,6)
     #N_evaluates = [1, 2, 3,4, 5,6, 7,8, 9,10]
-    N_evaluates=[2]
+    N_evaluates=[3]
     #error_rates=[0.05]
 
 
     if evaluate:
 
         if evaluate_fixed:
-            success_rates, success_rates_MWPM,observations = AgentPPO.evaluate_fixed_errors(evaluation_settings, N_evaluates, render, number_evaluations, max_moves, check_fails, save_files)
+            success_rates, success_rates_MWPM,observations, results, actions = AgentPPO.evaluate_fixed_errors(evaluation_settings, N_evaluates, render, number_evaluations, max_moves, check_fails, save_files)
         else:
-            success_rates, success_rates_MWPM,observations = AgentPPO.evaluate_error_rates(evaluation_settings, error_rates, render, number_evaluations, max_moves, check_fails, save_files, fixed)
+            success_rates, success_rates_MWPM,observations, results, actions = AgentPPO.evaluate_error_rates(evaluation_settings, error_rates, render, number_evaluations, max_moves, check_fails, save_files, fixed)
 
 
         success_rates_all.append(success_rates)
@@ -717,7 +840,7 @@ success_rates_all=np.array(success_rates_all)
 success_rates_all_MWPM=np.array(success_rates_all_MWPM)
 #illegal_action_rates_all=np.array(illegal_action_rates_all)
 
-print(success_rates_all_MWPM)
+
 
 #success_rates_1 = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=600000random_error_distribution=Truemask_actions=Truelambda_value=1fixed=FalseN=1_1.csv")
 #success_rates_all=np.vstack((success_rates_all, success_rates_1))

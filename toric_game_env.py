@@ -216,6 +216,10 @@ class ToricGameEnv(gym.Env):
         # Reward: if nonterminal, then the reward is 0
         if not self.state.is_terminal():
             self.done = False
+
+            # if self.state.qubit_pos[location] in self.initial_qubits_flips[0]: #prize for flipping one of the initial qubit flips
+            #     return self.state.encode(self.channels, self.memory), -self.continue_reward, False, False,{'state': self.state, 'message':"continue"}
+            # else:
             return self.state.encode(self.channels, self.memory), self.continue_reward, False, False,{'state': self.state, 'message':"continue"}
         # We're in a terminal state. Reward is 1 if won, -1 if lost
         self.done = True
@@ -281,7 +285,7 @@ class ToricGameEnvFixedErrs(ToricGameEnv):
             but report only the syndrome
         '''
         # Probabilistic mode
-        for q in np.random.randint(0,len(self.state.qubit_pos), self.N): 
+        for q in np.random.choice(len(self.state.qubit_pos), self.N, replace=False): 
         #for q in [38, 39]:
             #q = 23
             #q = np.random.choice([21, 15, 46, 19, 25, 26, 14],1)[0] 
@@ -390,7 +394,7 @@ class ToricGameEnvLocalFixedErrs(ToricGameEnv):
         '''
 
         #first choose the first qubit to flip
-        for index_qubit in np.random.randint(0,len(self.state.qubit_pos),self.N):
+        for index_qubit in np.random.choice(len(self.state.qubit_pos), self.N, replace=False):
 
 
             q = self.state.qubit_pos[index_qubit]
@@ -578,6 +582,16 @@ class Board(object):
         if debug:
             print("Initial errors:", [self.qubit_pos.index(q) for q in initialmoves])
 
+
+
+        '''
+        #check whether initial moves occur an even amount of times -> these should be removed as these result in an un-flipped qubit!
+        for i in initialmoves[0]:
+            counter = initialmoves[0].count(i)
+            if (counter%2==0):
+                initialmoves[0]=list(filter(lambda a: a!=i, initialmoves[0])) #KLOPT NOG NIET!
+        '''
+
         # Check for Z logical error
         zerrors = [0,0]
         for pos in self.z1pos:
@@ -607,6 +621,7 @@ class Board(object):
             xerrors[1] += self.qubit_values[1][ qubit_index ]
 
         #print("Zerrors", zerrors)
+
 
         if (zerrors[0]%2 == 1) or (zerrors[1]%2 == 1) or \
             (xerrors[0]%2 == 1) or (xerrors[1]%2 == 1):
