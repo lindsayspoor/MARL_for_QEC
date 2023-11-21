@@ -33,12 +33,12 @@ class ToricGameEnv(gym.Env):
         self.channels = [0]
         self.memory = False
         self.error_rate = settings['error_rate']
-        self.logical_error_reward=settings['logical_error_reward']
-        self.continue_reward=settings['continue_reward']
-        self.success_reward=settings['success_reward']
+        self.logical_error_reward=settings['l_reward']
+        self.continue_reward=settings['c_reward']
+        self.success_reward=settings['s_reward']
         self.mask_actions=settings['mask_actions']
-        self.illegal_action_reward = -1000#settings['illegal_action_reward']
-        self.lambda_value = settings['lambda_value']
+        self.illegal_action_reward = settings['i_reward']
+        self.lambda_value = settings['lambda']
         self.N = settings['N']
 
         # Keep track of the moves
@@ -63,6 +63,7 @@ class ToricGameEnv(gym.Env):
     def action_masks(self):
         #self.action_masks_list = []
         #action_mask=[]
+        self.mask_qubits=[]
         self.action_masks_list=np.zeros((len(self.state.qubit_pos)))
         self.action_masks_list[:]=False
         for i in self.state.syndrome_pos:
@@ -70,6 +71,7 @@ class ToricGameEnv(gym.Env):
             mask_coords = [[(a-1)%(2*self.state.size),b%(2*self.state.size)],[a%(2*self.state.size),(b-1)%(2*self.state.size)],[a%(2*self.state.size),(b+1)%(2*self.state.size)],[(a+1)%(2*self.state.size),b%(2*self.state.size)]]
             for j in mask_coords:
                 qubit_number = self.state.qubit_pos.index(j)
+                self.mask_qubits.append(qubit_number)
                 self.action_masks_list[qubit_number]=True
                 #action_mask.append(qubit_number)
         '''
@@ -83,10 +85,16 @@ class ToricGameEnv(gym.Env):
 
 
         self.action_masks_list=list(self.action_masks_list)
+
+
         return self.action_masks_list
         #self.mask_qubits.append(qubit_number)
         #self.action_mask = list(set(self.action_mask))
         #print(f" mask action space on qubits = {self.mask_qubits}")
+
+
+
+
 
     def generate_errors(self):
         # Reset the board state
@@ -97,7 +105,7 @@ class ToricGameEnv(gym.Env):
         self.initial_qubits_flips = [[],[]]
 
         self._set_initial_errors()
-
+        #self.render()
         #print(f"syndrome pos = {self.state.syndrome_pos[0]}")
         self.action_masks_list=self.action_masks()
 
@@ -186,13 +194,16 @@ class ToricGameEnv(gym.Env):
         pauli_opt=0
         pauli_X_flip=True
         pauli_Z_flip=False
+        #self.render()
 
 
-        '''
-        if self.action_mask:
+        if self.mask_actions==False:
+
+            self.action_masks_list = self.action_masks()
+
             if location not in self.mask_qubits:
                 return self.state.encode(self.channels, self.memory), self.illegal_action_reward, True, False,{'state': self.state, 'message': "illegal_action"}
-        '''
+
 
         if not without_illegal_actions:
             if pauli_X_flip and location in self.qubits_flips[0]:
@@ -212,6 +223,7 @@ class ToricGameEnv(gym.Env):
         self.state.act(self.state.qubit_pos[location], pauli_opt)
 
         #print(self.initial_qubits_flips[0][0])
+        
 
         # Reward: if nonterminal, then the reward is 0
         if not self.state.is_terminal():
