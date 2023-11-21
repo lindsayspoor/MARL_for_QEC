@@ -488,7 +488,6 @@ class PPO_agent:
         # and similar for columns
 
 
-
     def decode_MWPM_method(self,obs0_k, initial_flips, evaluation_settings):
 
 
@@ -655,11 +654,11 @@ check_fails=False
 board_size=5
 error_rate=0.01
 ent_coef=0.0
-logical_error_reward=0
-success_reward=50
+logical_error_reward=5
+success_reward=10
 continue_reward=-1
 illegal_action_reward=-1000
-total_timesteps=200000
+total_timesteps=400000
 random_error_distribution=True
 mask_actions=True
 log = True
@@ -667,7 +666,7 @@ lambda_value=1
 fixed=True
 evaluate_fixed=True
 N_evaluate=1
-N=1
+N=3
 
 
 #SET SETTINGS TO INITIALISE AGENT ON
@@ -731,14 +730,14 @@ success_rates_all_MWPM=[]
 #error_rates_curriculum=list(np.linspace(0.01,0.20,6))[1:]
 #error_rates_curriculum=[0.01]
 #N_curriculums=[1,2,3,4,5,6,7,8,9,10]
-#N_curriculums=[5]
-N_curriculums=[1,2,3,4,5]
-#N_curriculums=[1,2,3,4,5,6,7,8,9,10]
+N_curriculums=[1]
+#N_curriculums=[1,2,3,4,5]
+
 
 #for error_rate_curriculum in error_rates_curriculum:
 for N_curriculum in N_curriculums:
     
-    if N_curriculum>1:
+    if (curriculum == False) and(N_curriculum>1):
         train=False
         curriculum=True
     #initialisation_settings['error_rate']=error_rate_curriculum
@@ -773,7 +772,7 @@ for N_curriculum in N_curriculums:
         print(f"{N_curriculum=}")
         #initialisation_settings['error_rate']=error_rate_curriculum
         initialisation_settings['N']=N_curriculum
-        #initialisation_settings['total_timesteps']=100000
+
         save_model_path =''
         for key, value in initialisation_settings.items():
             save_model_path+=f"{key}={value}"
@@ -790,9 +789,9 @@ for N_curriculum in N_curriculums:
     p_start = 0.01 
     p_end = 0.20
     error_rates = np.linspace(p_start,p_end,6)
-    #N_evaluates = [1, 2, 3,4, 5,6, 7,8, 9,10]
-    N_evaluates=[3]
-    #error_rates=[0.05]
+    N_evaluates = [1, 2, 3,4, 5,6, 7,8, 9,10]
+    #N_evaluates=[3]
+
 
 
     if evaluate:
@@ -838,24 +837,11 @@ plot_settings['all_L']=[board_size]
 
 success_rates_all=np.array(success_rates_all)
 success_rates_all_MWPM=np.array(success_rates_all_MWPM)
-#illegal_action_rates_all=np.array(illegal_action_rates_all)
 
-
-
-#success_rates_1 = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=600000random_error_distribution=Truemask_actions=Truelambda_value=1fixed=FalseN=1_1.csv")
-#success_rates_all=np.vstack((success_rates_all, success_rates_1))
-
-#success_rates_001 = np.loadtxt(f"Files_results/files_success_rates/success_rates_ppo_board_size=5error_model=0error_rate=0.2logical_error_reward=5success_reward=10continue_reward=-1learning_rate=0.0005total_timesteps=600000random_error_distribution=Truemask_actions=Truelambda_value=1fixed=FalseN=1_0.01.csv")
-#success_rates_all=np.vstack((success_rates_all, success_rates_001))
-
-#np.append(N_curriculums, 1)
-#error_rates_curriculum.append(0.01)
-#N_curriculums.append(1)
-
-#error_rates_curriculum.append(0.01)
-#error_rates_curriculum.append(0.05)
 error_rates=np.array(N_evaluates)/50
 error_rates=list(error_rates)
+
+
 
 if benchmark_MWPM:
     sim_data, sim_all_data = simulate(simulation_settings)
