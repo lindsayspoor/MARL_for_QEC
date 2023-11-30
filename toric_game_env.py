@@ -173,6 +173,7 @@ class ToricGameEnv(gym.Env):
         plt.show()
 
     def step(self, location,  without_illegal_actions=True):
+
         '''
         Args:
             location: coord of the qubit to flip
@@ -196,14 +197,14 @@ class ToricGameEnv(gym.Env):
         pauli_Z_flip=False
         #self.render()
 
-
+        '''
         if self.mask_actions==False:
 
             self.action_masks_list = self.action_masks()
 
             if location not in self.mask_qubits:
                 return self.state.encode(self.channels, self.memory), self.illegal_action_reward, True, False,{'state': self.state, 'message': "illegal_action"}
-
+        '''
 
         if not without_illegal_actions:
             if pauli_X_flip and location in self.qubits_flips[0]:
@@ -228,12 +229,15 @@ class ToricGameEnv(gym.Env):
         # Reward: if nonterminal, then the reward is 0
         if not self.state.is_terminal():
             self.done = False
+            #if len(self.qubits_flips[0])<=len(self.initial_qubits_flips[0]):
 
-            # if self.state.qubit_pos[location] in self.initial_qubits_flips[0]: #prize for flipping one of the initial qubit flips
-            #     return self.state.encode(self.channels, self.memory), -self.continue_reward, False, False,{'state': self.state, 'message':"continue"}
-            # else:
             return self.state.encode(self.channels, self.memory), self.continue_reward, False, False,{'state': self.state, 'message':"continue"}
+    
+            #else:
+                #return self.state.encode(self.channels, self.memory), self.continue_reward*10, False, False,{'state': self.state, 'message':"continue"}
+        
         # We're in a terminal state. Reward is 1 if won, -1 if lost
+
         self.done = True
         if self.state.has_logical_error(self.initial_qubits_flips):
             return self.state.encode(self.channels, self.memory), self.logical_error_reward, True, False,{'state': self.state, 'message':"logical_error"}
@@ -242,6 +246,7 @@ class ToricGameEnv(gym.Env):
 
 
     def generate_new_error(self):
+
         q = np.random.randint(0,len(self.state.qubit_pos))
         q = self.state.qubit_pos[q]
 
@@ -255,6 +260,7 @@ class ToricGameEnv(gym.Env):
             self.initial_qubits_flips[1].append( q )
 
         self.state.act(q, pauli_opt)
+
         #self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))
 
 
@@ -297,6 +303,7 @@ class ToricGameEnvFixedErrs(ToricGameEnv):
             but report only the syndrome
         '''
         # Probabilistic mode
+        #self.N=np.random.randint(1,4)
         for q in np.random.choice(len(self.state.qubit_pos), self.N, replace=False): 
         #for q in [38, 39]:
             #q = 23
