@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from stable_baselines3 import PPO
-from toric_game_env import ToricGameDynamicEnv,  ToricGameDynamicEnvFixedErrs
+from toric_game_dynamic_env import ToricGameDynamicEnv,  ToricGameDynamicEnvFixedErrs
 from config import ErrorModel
 from stable_baselines3.ppo.policies import MlpPolicy
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
@@ -105,7 +105,7 @@ class PPO_agent:
         # Create log dir
         self.log=log
         if self.log:
-            self.log_dir = "log_dir"
+            self.log_dir = "log_dir_dynamic"
             os.makedirs(self.log_dir, exist_ok=True)
 
 
@@ -321,39 +321,40 @@ class PPO_agent:
     def evaluate_model(self, evaluation_settings, render, number_evaluations, max_moves, check_fails):
         print("evaluating the model...")
         moves=0
-        logical_errors=0
-        success=0
-        success_MWPM=0
-        logical_errors_MWPM=0
-        observations=np.zeros((number_evaluations, evaluation_settings['board_size']*evaluation_settings['board_size']))
-        results=np.zeros((number_evaluations,2)) #1st column for agent, 2nd column for MWPM decoder
-        actions=np.zeros((number_evaluations,max_moves,2)) #1st column for agent, 2nd column for MWPM decoder (3rd dimension)
+        #success_MWPM=0
+        #logical_errors_MWPM=0
+        #observations=np.zeros((number_evaluations, evaluation_settings['board_size']*evaluation_settings['board_size']))
+        #results=np.zeros((number_evaluations,2)) #1st column for agent, 2nd column for MWPM decoder
+        actions=np.zeros((number_evaluations,max_moves,1)) #1st column for agent (3rd dimension)
         actions[:,:,:]=np.nan
-        
+        reward_agent=[]
         #data_evaluations=np.zeros((number_evaluations))
 
         for k in range(number_evaluations):
+            rewards=0
             obs, info = self.env.reset()
-            initial_flips = AgentPPO.env.initial_qubits_flips
+            #initial_flips = AgentPPO.env.initial_qubits_flips
 
-            obs0=obs
-            observations[k,:]=obs
-            obs0_k=obs0.reshape((evaluation_settings['board_size'],evaluation_settings['board_size']))
+            #obs0=obs
+            #observations[k,:]=obs
+            #obs0_k=obs0.reshape((evaluation_settings['board_size'],evaluation_settings['board_size']))
 
-            MWPM_check, MWPM_actions = self.decode_MWPM_method(obs0_k, initial_flips, evaluation_settings)
+            #MWPM_check, MWPM_actions = self.decode_MWPM_method(obs0_k, initial_flips, evaluation_settings)
 
-            actions[k,:MWPM_actions.shape[0],1] = MWPM_actions[:,0]
+            #actions[k,:MWPM_actions.shape[0],1] = MWPM_actions[:,0]
 
-            if MWPM_check==True:
-                success_MWPM+=1
-                results[k,1]=1 #1 for success
-            if MWPM_check==False:
-                logical_errors_MWPM+=1
-                results[k,1]=0 #0 for fail
+            #if MWPM_check==True:
+                #success_MWPM+=1
+                #results[k,1]=1 #1 for success
+            #if MWPM_check==False:
+                #logical_errors_MWPM+=1
+                #results[k,1]=0 #0 for fail
             #self.env.render()
             if render:
                 self.env.render()
             for i in range(max_moves):
+                if i == (max_moves-1):
+                    print("max moves/max reward reached")
                 if evaluation_settings['mask_actions']:
                     action_masks=get_action_masks(self.env)
                     #print(f"{action_masks=}")
@@ -362,211 +363,61 @@ class PPO_agent:
                 else:
                     action, _state = self.model.predict(obs)
                 obs, reward, done, truncated, info = self.env.step(action)#, without_illegal_actions=True)
+                #print(f"{done=}")
+                #print(f"{reward=}")
                 actions[k,i,0]=action
                 moves+=1
+                rewards+=reward
                 if render:
+                    print(info['message'])
                     self.env.render()
                 if done:
-                    if reward == evaluation_settings['l_reward']:
-                        if check_fails:
-                            if results[k,0]==0 and results[k,1]==1:
+                    reward_agent.append(rewards)
+                    
+                    #if reward == evaluation_settings['l_reward']:
+                        #if check_fails:
+                            #if results[k,0]==0 and results[k,1]==1:
 
-                                print(info['message'])
+                                #print(info['message'])
 
-                                self.render(obs0_k,evaluation_settings, actions[k,:,:], initial_flips)
-                        logical_errors+=1
-                        results[k,0]=0 #0 for fail
-                    if reward == evaluation_settings['s_reward']:
-                        success+=1
-                        results[k,0]=1 #1 for success
+                                #self.render(obs0_k,evaluation_settings, actions[k,:,:], initial_flips)
+                        #logical_errors+=1
+                        #results[k,0]=0 #0 for fail
+                    #if reward == evaluation_settings['s_reward']:
+                        #success+=1
+                        #results[k,0]=1 #1 for success
                         #self.env.render()
-                        self.env.reset()
+                        #self.env.reset()
                     break
 
-
-
+        mean_reward=np.mean(reward_agent)
+        print(f"mean reward per evaluation is {mean_reward}")
                     
             
         print(f"mean number of moves per evaluation is {moves/number_evaluations}")
         
-        if (success+logical_errors)==0:
-            success_rate = 0
-        else:
-            success_rate= success / (success+logical_errors)
-
-        if (success_MWPM+logical_errors_MWPM)==0:
-            success_rate_MWPM = 0
-        else:
-            success_rate_MWPM= success_MWPM / (success_MWPM+logical_errors_MWPM)
 
         print("evaluation done")
 
-        return success_rate, success_rate_MWPM, observations, results, actions
-
-    def matching_to_path(self,matchings, grid_q):
-
-        """TESTED(for 1 matching):Add path of matchings to qubit grid
-            input:
-                matchings: array with tuples of two matched stabilizers as elements(stabilizer = tuple of coords)
-                grid_q: grid of qubits with errors before correction
-            output:
-                grid_q: grid of qubits with all errors(correction=adding errors)
-            """
-        L = len(grid_q[0])
-        for stab1, stab2 in matchings:
-            error_path = [0, 0]
-            row_dif = abs(stab1[0] - stab2[0])
-            if row_dif > L - row_dif:
-                # path through edge
-                error_path[0] += 1
-            col_dif = abs(stab1[1] - stab2[1])
-            if col_dif > L - col_dif:
-                # path through edge
-                error_path[1] += 1
-            last_row = stab1[0]
-            if stab1[0] != stab2[0]:  # not the same row
-                up_stab = min(stab1, stab2)
-                down_stab = max(stab1, stab2)
-                q_col = up_stab[1]  # column of the upper stabilizer
-                last_row = down_stab[0]
-                if error_path[0]:  # through edge
-                    for s_row in range(down_stab[0] - L, up_stab[0]):
-                        q_row = (s_row + 1) * 2  # row under current stabilizer
-                        grid_q[q_row][q_col] += 1  # make error = flip bit
-                else:
-                    for s_row in range(up_stab[0], down_stab[0]):
-                        q_row = (s_row + 1) * 2  # row under current stabilizer
-                        grid_q[q_row][q_col] += 1
-
-            if stab1[1] != stab2[1]:  # not the same col
-                left_stab = min(stab1, stab2, key=lambda x: x[1])
-                right_stab = max(stab1, stab2, key=lambda x: x[1])
-                q_row = 2 * last_row + 1
-                if error_path[1]:  # through edge
-                    for s_col in range(right_stab[1] - L, left_stab[1]):
-                        q_col = s_col + 1  # col right of stabilizer
-                        grid_q[q_row][q_col] += 1  # make error = flip bit
-                else:
-                    for s_col in range(left_stab[1], right_stab[1]):
-                        q_col = s_col + 1  # col right of stabilizer
-                        grid_q[q_row][q_col] += 1
-        return grid_q
-
-
-    def check_correction(self,grid_q):
-        """(tested for random ones):Check if the correction is correct(no logical X gates)
-        input:
-            grid_q: grid of qubit with errors and corrections
-        output:
-            corrected: boolean whether correction is correct.
-        """
-        # correct if even times logical X1,X2=> even number of times through certain edges
-        # upper row = X1
-        if sum(grid_q[0]) % 2 == 1:
-            return (False, 'X1')
-        # odd rows = X2
-        if sum([grid_q[x][0] for x in range(1, len(grid_q), 2)]) == 1:
-            return (False, 'X2')
-
-        # and if all stabilizers give outcome +1 => even number of qubit flips for each stabilizer
-        # is this needed? or assume given stabilizer outcome is corrected for sure?
-        for row_idx in range(int(len(grid_q) / 2)):
-            for col_idx in range(len(grid_q[0])):
-                all_errors = 0
-                all_errors += grid_q[2 * row_idx][col_idx]  # above stabilizer
-                all_errors += grid_q[2 * row_idx + 1][col_idx]  # left of stabilizer
-                if row_idx < int(len(grid_q) / 2) - 1:  # not the last row
-                    all_errors += grid_q[2 * (row_idx + 1)][col_idx]
-                else:  # last row
-                    all_errors += grid_q[0][col_idx]
-                if col_idx < len(grid_q[2 * row_idx + 1]) - 1:  # not the last column
-                    all_errors += grid_q[2 * row_idx + 1][col_idx + 1]
-                else:  # last column
-                    all_errors += grid_q[2 * row_idx + 1][0]
-                if all_errors % 2 == 1:
-                    return (False, 'stab', row_idx, col_idx)  # stabilizer gives error -1
-
-        return (True, 'end')
-        # other way of checking: for each row, look if no errors on qubits, => no loop around torus,so no gate applied.
-        # and similar for columns
-
-
-    def decode_MWPM_method(self,obs0_k, initial_flips, evaluation_settings):
-
-
-        stab_errors = np.argwhere((obs0_k==1))
-
-
-        path_lengths = []
-
-        for stab1_idx in range(stab_errors.shape[0]-1):
-            for stab2_idx in range(stab1_idx + 1, stab_errors.shape[0]):
-                min_row_dif = min(abs(stab_errors[stab1_idx][0]-stab_errors[stab2_idx][0]), evaluation_settings['board_size']-abs(stab_errors[stab1_idx][0]-stab_errors[stab2_idx][0]))
-                min_col_dif = min(abs(stab_errors[stab1_idx][1]-stab_errors[stab2_idx][1]), evaluation_settings['board_size']-abs(stab_errors[stab1_idx][1]-stab_errors[stab2_idx][1]))
-
-                path_lengths.append([tuple(stab_errors[stab1_idx]),tuple(stab_errors[stab2_idx]), min_row_dif+min_col_dif])
-
-        G = nx.Graph()
-
-        for edge in path_lengths:
-            G.add_edge(edge[0],edge[1], weight=-edge[2])
-
-        matching = nx.algorithms.max_weight_matching(G, maxcardinality=True)
-
-        grid_q = [[0 for col in range(evaluation_settings['board_size'])] for row in range(2 * evaluation_settings['board_size'])]
-        grid_q=np.array(grid_q)
-
-        qubit_pos = AgentPPO.env.state.qubit_pos
-        for i in initial_flips[0]:
-            flip_index = [j==i for j in qubit_pos]
-            flip_index = np.reshape(flip_index, newshape=(2*evaluation_settings['board_size'], evaluation_settings['board_size']))
-            flip_index = np.argwhere(flip_index)
-
-            grid_q[flip_index[0][0],flip_index[0][1]]+=1 % 2
-        grid_q = list(grid_q)
-        grid_q_initial=np.copy(grid_q)
-
-
-        matched_error_grid = self.matching_to_path(matching, grid_q)
-
-
-        MWPM_grid = np.array(matched_error_grid)-grid_q_initial
-        MWPM_actions = np.argwhere(MWPM_grid.flatten()==1)
-
-        check = self.check_correction(matched_error_grid)
-
-
-    
-        return check[0], MWPM_actions
+        return mean_reward, actions
 
 
 
-
-
-    def evaluate_fixed_errors(self, evaluation_settings, N_evaluates, render, number_evaluations, max_moves, check_fails, save_files):
+    def evaluate_fixed_errors(self, evaluation_settings, N_evaluates, render, number_evaluations, max_moves,check_fails, save_files):
         
-        success_rates=[]
-        success_rates_MWPM=[]
-        observations_all=[]
+        rewards_agent=[]
+
 
         for N_evaluate in N_evaluates:
             print(f"{N_evaluate=}")
             evaluation_settings['fixed'] = evaluate_fixed
             evaluation_settings['N']=N_evaluate
             self.change_environment_settings(evaluation_settings)
-            success_rate, success_rate_MWPM, observations, results, actions = self.evaluate_model(evaluation_settings, render, number_evaluations, max_moves, check_fails)
-            success_rates.append(success_rate)
-            success_rates_MWPM.append(success_rate_MWPM)
-            observations_all.append(observations)
-            print(f"{success_rate=}")
-            print(f"{success_rate_MWPM=}")
+            reward_agent, actions = self.evaluate_model(evaluation_settings, render, number_evaluations, max_moves,check_fails)
+            rewards_agent.append(reward_agent)
 
+        rewards_agent=np.array(rewards_agent)
 
-
-        success_rates=np.array(success_rates)
-        success_rates_MWPM=np.array(success_rates_MWPM)
-        observations_all=np.array(observations_all)
-        print(f"{observations_all.shape=}")
 
 
         evaluation_path =''
@@ -575,21 +426,15 @@ class PPO_agent:
 
         if save_files:
             if fixed:
-                np.savetxt(f"Files_results/success_rates_agent/success_rates_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", success_rates)
-                np.savetxt(f"Files_results/success_rates_MWPM/success_rates_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", success_rates_MWPM)
-                np.savetxt(f"Files_results/observations/observations_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", observations)
-                np.savetxt(f"Files_results/results_agent_MWPM/results_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", results)
-                np.savetxt(f"Files_results/actions_agent_MWPM/actions_agent_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", actions[:,:,0])
-                np.savetxt(f"Files_results/actions_agent_MWPM/actions_MWPM_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", actions[:,:,1])
-            else:
-                np.savetxt(f"Files_results/success_rates_agent/success_rates_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", success_rates)
-                np.savetxt(f"Files_results/success_rates_MWPM/success_rates_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", success_rates_MWPM)
-                np.savetxt(f"Files_results/observations/observations_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", observations)
-                np.savetxt(f"Files_results/results_agent_MWPM/results_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", results)
-                np.savetxt(f"Files_results/actions_agent_MPWM/actions_agent_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", actions[:,:,0])
-                np.savetxt(f"Files_results/actions_agent_MPWM/actions_MWPM_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", actions[:,:,1])
+                np.savetxt(f"Files_results/rewards_dynamic_agent/rewards_dynamic_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", rewards_agent)
+                #np.savetxt(f"Files_results/rewards_dynamic_agent/actions_dynamic_ppo_{evaluation_path}_{loaded_model_settings['N']}.csv", actions)
 
-        return success_rates, success_rates_MWPM,observations, results, actions
+            else:
+                np.savetxt(f"Files_results/rewards_dynamic_agent/rewards_dynamic_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", rewards_agent)
+                #np.savetxt(f"Files_results/rewards_dynamic_agent/actions_dynamic_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.csv", actions)
+
+
+        return rewards_agent, actions
     
 
     def evaluate_error_rates(self,evaluation_settings, error_rates, render, number_evaluations, max_moves, check_fails, save_files, fixed):
@@ -644,12 +489,12 @@ class PPO_agent:
 
 
 #SETTINGS FOR RUNNING THIS SCRIPT
-train=True
+train=False
 curriculum=False #if set to True the agent will train on N_curriculum or error_rate_curriculum examples, using the training experience from 
 benchmark_MWPM=False
 save_files=True
-render=False
-number_evaluations=10000
+render=True
+number_evaluations=1000
 max_moves=200
 evaluate=True
 check_fails=False
@@ -657,7 +502,7 @@ check_fails=False
 board_size=5
 error_rate=0.01
 ent_coef=0.0
-total_timesteps=200000
+total_timesteps=50000
 random_error_distribution=True
 mask_actions=True #if set to True action masking is enabled, the illegal actions are masked out by the model. If set to False the agent gets a reward 'illegal_action_reward' when choosing an illegal action.
 log = True #if set to True the learning curve during training is registered and saved.
@@ -665,15 +510,18 @@ lambda_value=1
 fixed=True #if set to True the agent is trained on training examples with a fixed amount of N initial errors. If set to False the agent is trained on training examples given an error rate error_rate for each qubit to have a chance to be flipped.
 evaluate_fixed=True #if set to True the trained model is evaluated on examples with a fixed amount of N initial errors. If set to False the trained model is evaluated on examples in which each qubit is flipped with a chance of error_rate.
 #N_evaluates = [1, 2, 3,4, 5] #the number of fixed initial flips N the agent is evaluated on if evaluate_fixed is set to True
-N_evaluates=[3] 
+N_evaluates=[1] 
 N=1 #the number of fixed initinal flips N the agent model is trained on or loaded when fixed is set to True
 error_rates_eval=list(np.linspace(0.01,0.20,6))
+#N_curriculums=[2,3,4]
+#N_curriculums=[4]
+N_curriculums=[1]
 
 #SET SETTINGS TO INITIALISE AGENT ON
 initialisation_settings = {'board_size': board_size,
             'error_model': ErrorModel['UNCORRELATED'],
             'error_rate': error_rate,
-            'lr':0.0005,
+            'lr':0.001,
             'total_timesteps': total_timesteps,
             'random_error_distr': random_error_distribution,
             'mask_actions': mask_actions,
@@ -687,7 +535,7 @@ initialisation_settings = {'board_size': board_size,
 loaded_model_settings = {'board_size': board_size,
             'error_model': ErrorModel['UNCORRELATED'],
             'error_rate': error_rate,
-            'lr':0.0005,
+            'lr':0.001,
             'total_timesteps': total_timesteps,
             'random_error_distr': random_error_distribution,
             'mask_actions': mask_actions,
@@ -700,7 +548,7 @@ loaded_model_settings = {'board_size': board_size,
 evaluation_settings = {'board_size': board_size,
             'error_model': ErrorModel['UNCORRELATED'],
             'error_rate': error_rate,
-            'lr':0.0005,
+            'lr':0.001,
             'total_timesteps': total_timesteps,
             'random_error_distr': random_error_distribution,
             'mask_actions': mask_actions,
@@ -712,12 +560,12 @@ evaluation_settings = {'board_size': board_size,
 
 
 
-success_rates_all=[]
-success_rates_all_MWPM=[]
+rewards_agent_all=[]
+
 
 error_rates_curriculum=list(np.linspace(0.01,0.20,6))[1:]
 
-N_curriculums=[1,2,3,4]
+#N_curriculums=[2,3,4]
 #N_curriculums=[4]
 
 
@@ -795,63 +643,57 @@ for curriculum_val in curriculums:
     if evaluate:
 
         if evaluate_fixed:
-            success_rates, success_rates_MWPM,observations, results, actions = AgentPPO.evaluate_fixed_errors(evaluation_settings, N_evaluates, render, number_evaluations, max_moves, check_fails, save_files)
+            rewards_agent, actions = AgentPPO.evaluate_fixed_errors(evaluation_settings, N_evaluates, render, number_evaluations, max_moves, check_fails, save_files)
         else:
             success_rates, success_rates_MWPM,observations, results, actions = AgentPPO.evaluate_error_rates(evaluation_settings, error_rates, render, number_evaluations, max_moves, check_fails, save_files, fixed)
 
 
-        success_rates_all.append(success_rates)
-        success_rates_all_MWPM.append(success_rates_MWPM)
+    rewards_agent_all.append(rewards_agent)
 
+rewards_agent_all=np.array(rewards_agent_all)
 
 
 evaluation_path =''
 for key, value in evaluation_settings.items():
     evaluation_path+=f"{key}={value}"
 
+
 if fixed:
-    path = f"Figure_results/Results_benchmarks/benchmark_MWPM_{evaluation_path}_{loaded_model_settings['N']}.pdf"
+    path = f"Figure_results/Results_benchmarks/results_dynamic_ppo_{evaluation_path}_{loaded_model_settings['N']}.pdf"
 else:
-    path = f"Figure_results/Results_benchmarks/benchmark_MWPM_{evaluation_path}_{loaded_model_settings['error_rate']}.pdf"
+    path = f"Figure_results/Results_benchmarks/results_dynamic_ppo_{evaluation_path}_{loaded_model_settings['error_rate']}.pdf"
+
+print(f"{rewards_agent_all}")
+
+plt.figure()
+#for i in len(N_curriculums):
+plt.plot(N_evaluates,rewards_agent_all, label=f"N={N_curriculums}")
+plt.title("PPO agent on dynamic environment")
+plt.legend()
+plt.xlabel("N")
+plt.ylabel("Reward")
+plt.savefig(path)
 
 
 
-simulation_settings = {'decoder': 'MWPM',
-                    'N': 1000,
-                    'delta_p': 0.001,
-                    'p_start': p_start,
-                    'p_end': p_end,
-                    'path': path,
-                    'tex_plot' : False,
-                    'save_data' : True,
-                    'plot_all' : True,
-                    'all_L':[board_size],
-                    'random_errors':random_error_distribution,
-                    'lambda_value':lambda_value}
 
-
-plot_settings = simulation_settings
-plot_settings['all_L']=[board_size]
-
-success_rates_all=np.array(success_rates_all)
-success_rates_all_MWPM=np.array(success_rates_all_MWPM)
 
 #error_rates=np.array(N_evaluates)/50
 #error_rates=list(error_rates)
 
 
 
-if benchmark_MWPM:
-    sim_data, sim_all_data = simulate(simulation_settings)
-    plot(plot_settings, sim_data, sim_all_data, success_rates_all, error_rates, N_curriculums)
+#if benchmark_MWPM:
+    #sim_data, sim_all_data = simulate(simulation_settings)
+    #plot(plot_settings, sim_data, sim_all_data, success_rates_all, error_rates, N_curriculums)
 
 #if plot_illegal_actions_rate:
 
 
-if fixed:
-    path_plot = f"Figure_results/Results_benchmarks/PPO_vs_MWPM_{evaluation_path}_{loaded_model_settings['N']}.pdf"
-else:
-    path_plot = f"Figure_results/Results_benchmarks/PPO_vs_MWPM_{evaluation_path}_{loaded_model_settings['error_rate']}.pdf"
+#if fixed:
+    #path_plot = f"Figure_results/Results_benchmarks/PPO_vs_MWPM_{evaluation_path}_{loaded_model_settings['N']}.pdf"
+#else:
+    #path_plot = f"Figure_results/Results_benchmarks/PPO_vs_MWPM_{evaluation_path}_{loaded_model_settings['error_rate']}.pdf"
 
 
-plot_benchmark_MWPM(success_rates_all, success_rates_all_MWPM, error_rates_eval, board_size,path_plot,loaded_model_settings['N'], loaded_model_settings['error_rate'],evaluate_fixed)
+#plot_benchmark_MWPM(success_rates_all, success_rates_all_MWPM, error_rates_eval, board_size,path_plot,loaded_model_settings['N'], loaded_model_settings['error_rate'],evaluate_fixed)

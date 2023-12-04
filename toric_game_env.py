@@ -63,7 +63,7 @@ class ToricGameEnv(gym.Env):
     def action_masks(self):
         #self.action_masks_list = []
         #action_mask=[]
-        self.mask_qubits=[]
+        #self.mask_qubits=[]
         self.action_masks_list=np.zeros((len(self.state.qubit_pos)))
         self.action_masks_list[:]=False
         for i in self.state.syndrome_pos:
@@ -71,9 +71,13 @@ class ToricGameEnv(gym.Env):
             mask_coords = [[(a-1)%(2*self.state.size),b%(2*self.state.size)],[a%(2*self.state.size),(b-1)%(2*self.state.size)],[a%(2*self.state.size),(b+1)%(2*self.state.size)],[(a+1)%(2*self.state.size),b%(2*self.state.size)]]
             for j in mask_coords:
                 qubit_number = self.state.qubit_pos.index(j)
-                self.mask_qubits.append(qubit_number)
+                #self.mask_qubits.append(qubit_number)
                 self.action_masks_list[qubit_number]=True
+                
+
                 #action_mask.append(qubit_number)
+
+
         '''
         action_mask = list(set(action_mask))
         for i in range(len(self.state.qubit_pos)):
@@ -86,7 +90,8 @@ class ToricGameEnv(gym.Env):
 
         self.action_masks_list=list(self.action_masks_list)
 
-
+        #print(self.action_masks_list)
+        #print(f"possible actions are: {np.argwhere(np.array(self.action_masks_list)==True)}")
         return self.action_masks_list
         #self.mask_qubits.append(qubit_number)
         #self.action_mask = list(set(self.action_mask))
@@ -98,6 +103,7 @@ class ToricGameEnv(gym.Env):
 
     def generate_errors(self):
         # Reset the board state
+        #print("inside generate_errors() function")
         self.state.reset()
 
         # Let the opponent do it's initial evil
@@ -108,19 +114,25 @@ class ToricGameEnv(gym.Env):
         #self.render()
         #print(f"syndrome pos = {self.state.syndrome_pos[0]}")
         self.action_masks_list=self.action_masks()
+        
 
         self.done = self.state.is_terminal()
+        #print(f"{self.done=}")
         self.reward = 0
         if self.done:
             self.reward = self.success_reward
             if self.state.has_logical_error(self.initial_qubits_flips):
                 self.reward = self.logical_error_reward
+        #print("exiting generate_errors() function")
 
         return self.state.encode(self.channels, self.memory)
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[Any, dict[str, Any]]:
          super().reset(seed=seed, options=options)
+         #print("inside reset() function")
          initial_observation = self.generate_errors()
+         #print(f"{initial_observation=}")
+         #print("exiting reset() function")
          return initial_observation, {'state': self.state, 'message':"reset"}
 
 
@@ -184,7 +196,19 @@ class ToricGameEnv(gym.Env):
             done: boolean,
             info: state dict
         '''
+
+        #print("inside step() function")
+
+        #print(f"{self.qubits_flips[0]=}")
         # If already terminal, then don't do anything, count as win
+        #print(f"{self.done=}")
+        #qubit_flips_before=self.qubits_flips[0]
+        
+        #if location in qubit_flips_before:
+            #continue_reward = self.illegal_action_reward
+        #else:
+            #continue_reward = self.continue_reward
+
         if self.done:
             self.reward = self.success_reward
             return self.state.encode(self.channels, self.memory), self.success_reward, True, False,{'state': self.state, 'message':"success"}
@@ -220,21 +244,22 @@ class ToricGameEnv(gym.Env):
         if pauli_Z_flip:
             self.qubits_flips[1].append(location)
 
-
+        #print(f"{self.qubits_flips[0]=}")
+        
         self.state.act(self.state.qubit_pos[location], pauli_opt)
 
         #print(self.initial_qubits_flips[0][0])
         
-
+        #print(f"exiting step() function")
         # Reward: if nonterminal, then the reward is 0
         if not self.state.is_terminal():
             self.done = False
             #if len(self.qubits_flips[0])<=len(self.initial_qubits_flips[0]):
-
             return self.state.encode(self.channels, self.memory), self.continue_reward, False, False,{'state': self.state, 'message':"continue"}
     
             #else:
-                #return self.state.encode(self.channels, self.memory), self.continue_reward*10, False, False,{'state': self.state, 'message':"continue"}
+                #print("location already chosen")
+                #return self.state.encode(self.channels, self.memory), self.illegal_action_reward, False, False,{'state': self.state, 'message':"continue, too many flips"}
         
         # We're in a terminal state. Reward is 1 if won, -1 if lost
 
@@ -270,6 +295,7 @@ class ToricGameEnv(gym.Env):
         '''
         # Probabilitic mode
         # Pick random sites according to error rate
+
         for q in self.state.qubit_pos:    
             if np.random.rand() < self.error_rate:
             #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
@@ -304,6 +330,8 @@ class ToricGameEnvFixedErrs(ToricGameEnv):
         '''
         # Probabilistic mode
         #self.N=np.random.randint(1,4)
+        #
+        # print(f"new error")
         for q in np.random.choice(len(self.state.qubit_pos), self.N, replace=False): 
         #for q in [38, 39]:
             #q = 23
@@ -324,6 +352,7 @@ class ToricGameEnvFixedErrs(ToricGameEnv):
             if pauli_Z_flip:
                 self.initial_qubits_flips[1].append( q )
 
+            #print(f"setting new error on initial flip position {self.state.qubit_pos.index(q)} and acting on it")
             self.state.act(q, pauli_opt)
             #break
         # Now unflip the qubits, they're a secret
@@ -545,10 +574,15 @@ class Board(object):
         #coord = self.qubit_pos[coord]
 
         # Flip it!
+        #print(f"{qubit_index=}")
+       
+        #print(f"{self.qubit_values[0][qubit_index]=}")
         if pauli_X_flip:
             self.qubit_values[0][qubit_index] = (self.qubit_values[0][qubit_index] + 1) % 2
         if pauli_Z_flip:
             self.qubit_values[1][qubit_index] = (self.qubit_values[1][qubit_index] + 1) % 2
+
+        #print(f"{self.qubit_values[0][qubit_index]=}")
 
         # Update the syndrome measurements
         # Only need to incrementally change

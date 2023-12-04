@@ -10,6 +10,7 @@ import gymnasium
 import sys, os
 import matplotlib.pyplot as plt
 from scipy.spatial import distance_matrix
+import collections
 
 from config import ErrorModel
 
@@ -33,11 +34,11 @@ class ToricGameDynamicEnv(gym.Env):
         self.channels = [0]
         self.memory = False
         self.error_rate = settings['error_rate']
-        self.logical_error_reward=settings['l_reward']
-        self.continue_reward=settings['c_reward']
-        self.success_reward=settings['s_reward']
+        #self.logical_error_reward=settings['l_reward']
+        #self.continue_reward=settings['c_reward']
+        #self.success_reward=settings['s_reward']
         self.mask_actions=settings['mask_actions']
-        self.illegal_action_reward = settings['i_reward']
+        #self.illegal_action_reward = settings['i_reward']
         self.lambda_value = settings['lambda']
         self.N = settings['N']
 
@@ -45,7 +46,7 @@ class ToricGameDynamicEnv(gym.Env):
         self.qubits_flips = [[],[]]
         self.initial_qubits_flips = [[],[]]
 
-
+        self.counter=0 #counts the amount of steps taken by the agent
         # Empty State
         self.state = Board(self.board_size)
         self.done = None
@@ -60,11 +61,12 @@ class ToricGameDynamicEnv(gym.Env):
         seed2 = seeding.hash_seed(seed1 + 1) % 2**32
         return [seed1, seed2]
 
+
     def action_masks(self):
         #self.action_masks_list = []
         #action_mask=[]
         self.mask_qubits=[]
-        self.action_masks_list=np.zeros((len(self.state.qubit_pos)))
+        self.action_masks_list=np.zeros((len(self.state.qubit_pos)+1))
         self.action_masks_list[:]=False
         for i in self.state.syndrome_pos:
             a,b = i[0],i[1]
@@ -74,6 +76,7 @@ class ToricGameDynamicEnv(gym.Env):
                 self.mask_qubits.append(qubit_number)
                 self.action_masks_list[qubit_number]=True
                 #action_mask.append(qubit_number)
+
         '''
         action_mask = list(set(action_mask))
         for i in range(len(self.state.qubit_pos)):
@@ -103,25 +106,41 @@ class ToricGameDynamicEnv(gym.Env):
         # Let the opponent do it's initial evil
         self.qubits_flips = [[],[]]
         self.initial_qubits_flips = [[],[]]
-
-        self._set_initial_errors()
+        #print(f"setting initial errors")
+        self._set_initial_errors(self.N)
         #self.render()
         #print(f"syndrome pos = {self.state.syndrome_pos[0]}")
         self.action_masks_list=self.action_masks()
 
-        self.done = self.state.is_terminal()
-        self.reward = 0
-        if self.done:
-            self.reward = self.success_reward
-            if self.state.has_logical_error(self.initial_qubits_flips):
-                self.reward = self.logical_error_reward
+        self.done = self.state.has_logical_error(self.initial_qubits_flips)
+        self.reward=1
+
 
         return self.state.encode(self.channels, self.memory)
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[Any, dict[str, Any]]:
          super().reset(seed=seed, options=options)
+         #print(f"reset game, new game")
+         self.counter=0 #sets the amount of steps back to 0 when a new game starts
          initial_observation = self.generate_errors()
+         #print(f"{self.initial_qubits_flips[0]=}")
          return initial_observation, {'state': self.state, 'message':"reset"}
+
+    def generate_new_errors(self):
+
+        new_N = 1
+        self._set_initial_errors(new_N)
+        #print(f"{self.initial_qubits_flips[0]=}")
+        #self.render()
+        #print(f"syndrome pos = {self.state.syndrome_pos[0]}")
+        self.action_masks_list=self.action_masks()
+
+        self.done = self.state.has_logical_error(self.initial_qubits_flips)
+        #self.reward = 1
+
+
+        return self.state.encode(self.channels, self.memory)
+
 
 
     def close(self):
@@ -183,10 +202,16 @@ class ToricGameDynamicEnv(gym.Env):
             done: boolean,
             info: state dict
         '''
+        #print(f"entering step() function")
+        #print(f"{self.counter=}")
+        if (self.counter > 0) and (self.counter %2 == 0):
+            #print(f"generating new error") 
+            self.generate_new_errors()
+        #print(f"{self.done=}")
         # If already terminal, then don't do anything, count as win
         if self.done:
 
-            return self.state.encode(self.channels, self.memory), 1, True, False,{'state': self.state, 'message':"game over!"}
+            return self.state.encode(self.channels, self.memory), -10, True, False,{'state': self.state, 'message':"game over!"}
 
         # Check if we flipped twice the same qubit 
         #pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
@@ -196,15 +221,21 @@ class ToricGameDynamicEnv(gym.Env):
         pauli_Z_flip=False
         #self.render()
 
-        if location == len(self.state.qubit_pos): #if the last action in the action space is chosen, the agent needs to do nothing in this case.
+        self.counter+=1
+        #print(f"acting on location {location}")
+
+        if  location == len(self.state.qubit_pos): #if the last action in the action space is chosen, the agent needs to do nothing in this case.
             if not self.state.has_logical_error(self.initial_qubits_flips):
+                #print(f"do nothing & continue")
                 return self.state.encode(self.channels, self.memory), 1, False, False,{'state': self.state, 'message':"continue"}
             else:
+                #print(f"do nothing & game over")
                 return self.state.encode(self.channels, self.memory), 1, True, False,{'state': self.state, 'message':"game over!"}
         
+
+                
+
         else:
-
-
             if pauli_X_flip:
                 self.qubits_flips[0].append(location) #moet dit ook worden geregistreerd voor de 'do nothing' situatie? nee toch?
 
@@ -214,9 +245,11 @@ class ToricGameDynamicEnv(gym.Env):
             self.state.act(self.state.qubit_pos[location], pauli_opt)
 
             if not self.state.has_logical_error(self.initial_qubits_flips):
+                #print(f"continue")
                 return self.state.encode(self.channels, self.memory), 1, False, False,{'state': self.state, 'message':"continue"}
             else:
-                return self.state.encode(self.channels, self.memory), 1, True, False,{'state': self.state, 'message':"game over!"}
+                #print(f"gamr over")
+                return self.state.encode(self.channels, self.memory), -10, True, False,{'state': self.state, 'message':"game over!"}
         
 
 
@@ -254,12 +287,12 @@ class ToricGameDynamicEnvFixedErrs(ToricGameDynamicEnv):
         super().__init__(settings)
         
 
-    def _set_initial_errors(self):
+    def _set_initial_errors(self, N):
         ''' Set random initial errors with an %error_rate rate
             but report only the syndrome
         '''
         # Probabilistic mode
-        for q in np.random.choice(len(self.state.qubit_pos), self.N, replace=False): 
+        for q in np.random.choice(len(self.state.qubit_pos), N, replace=False): 
         #for q in [38, 39]:
             #q = 23
             #q = np.random.choice([21, 15, 46, 19, 25, 26, 14],1)[0] 
@@ -422,10 +455,11 @@ class Board(object):
 
 
         #check whether initial moves occur an even amount of times -> these should be removed as these result in an un-flipped qubit!
+
         for i in initialmoves[0]:
             counter = initialmoves[0].count(i)
             if (counter%2==0):
-                initialmoves[0].remove(i)
+                initialmoves[0] = [j for j in initialmoves[0] if j != i]
 
 
         # Check for Z logical error
@@ -505,3 +539,6 @@ class Board(object):
             image[pos[0], pos[1]] = str(int(self.qubit_values[channel,i]))+str(i) if number else str(int(self.qubit_values[channel, i]))
 
         return np.array(image)
+
+
+
