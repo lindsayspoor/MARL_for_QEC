@@ -230,7 +230,7 @@ class ToricGameDynamicEnv(gym.Env):
                 return self.state.encode(self.channels, self.memory), 1, False, False,{'state': self.state, 'message':"continue"}
             else:
                 #print(f"do nothing & game over")
-                return self.state.encode(self.channels, self.memory), 1, True, False,{'state': self.state, 'message':"game over!"}
+                return self.state.encode(self.channels, self.memory), -10, True, False,{'state': self.state, 'message':"game over!"}
         
 
                 

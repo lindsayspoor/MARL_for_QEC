@@ -6,10 +6,7 @@ import gymnasium as gym
 #import gym
 from gymnasium.utils import seeding
 from gymnasium import spaces
-import gymnasium
-import sys, os
 import matplotlib.pyplot as plt
-from scipy.spatial import distance_matrix
 
 from config import ErrorModel
 
@@ -113,7 +110,7 @@ class ToricGameEnv(gym.Env):
         self._set_initial_errors()
         #self.render()
         #print(f"syndrome pos = {self.state.syndrome_pos[0]}")
-        self.action_masks_list=self.action_masks()
+        #self.action_masks_list=self.action_masks()
         
 
         self.done = self.state.is_terminal()
@@ -298,7 +295,7 @@ class ToricGameEnv(gym.Env):
 
         for q in self.state.qubit_pos:    
             if np.random.rand() < self.error_rate:
-            #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
+                #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
                 if self.error_model == ErrorModel["UNCORRELATED"]:
                     pauli_opt = 0
                 elif self.error_model == ErrorModel["DEPOLARIZING"]:
@@ -359,141 +356,7 @@ class ToricGameEnvFixedErrs(ToricGameEnv):
 
         self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))
 
-class ToricGameEnvLocalErrs(ToricGameEnv):
-    def __init__(self, settings):
-        super().__init__(settings)
-        
 
-    def _set_initial_errors(self):
-        ''' Set random initial errors with an %error_rate rate
-            but report only the syndrome
-        '''
-        # Probabilitic mode
-
-        #probability_matrix = np.random.rand(len(self.state.qubit_pos))
-
-        #first choose the first qubit to flip
-        for index_qubit in range(len(self.state.qubit_pos)):
-            if np.random.rand() < self.error_rate:
-
-                q = self.state.qubit_pos[index_qubit]
-                #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
-                if self.error_model == ErrorModel["UNCORRELATED"]:
-                    pauli_opt = 0
-                elif self.error_model == ErrorModel["DEPOLARIZING"]:
-                    pauli_opt = np.random.randint(0,3)
-
-                pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
-                pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
-
-
-                if pauli_X_flip:
-                    self.initial_qubits_flips[0].append( q )
-                if pauli_Z_flip:
-                    self.initial_qubits_flips[1].append( q )
-
-                self.state.act(q, pauli_opt)
-
-                dist_matrix = distance_matrix(self.state.qubit_pos, self.state.qubit_pos) #1x aanmaken
-                selected_dist_matrix = dist_matrix[index_qubit]/np.sum(dist_matrix[index_qubit])
-                weighted_matrix = (1-selected_dist_matrix)
-                where_zero = np.argwhere(weighted_matrix == np.max(weighted_matrix))[0]
-                weighted_matrix[where_zero] = 0
-
-                if np.random.rand() < self.error_rate:
-                    #for index_second_qubit in range(len(self.state.qubit_pos)): #permute
-                    probabilities = np.exp(-weighted_matrix/self.lambda_value)
-                    probabilities = probabilities/np.sum(probabilities)
-                    index_second_qubit = np.random.choice(range(len(self.state.qubit_pos)), p=probabilities)
-                    # for ind, secondbit in enumerate(self.state.qubit_pos):
-                    # if np.random.rand()*np.exp(-weighted_matrix[index_second_qubit]/self.lambda_value) < self.error_rate:
-                    s = self.state.qubit_pos[index_second_qubit]
-                    #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
-                    if self.error_model == ErrorModel["UNCORRELATED"]:
-                        pauli_opt = 0
-                    elif self.error_model == ErrorModel["DEPOLARIZING"]:
-                        pauli_opt = np.random.randint(0,3)
-
-                    pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
-                    pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
-
-
-                    if pauli_X_flip:
-                        self.initial_qubits_flips[0].append( s )
-                    if pauli_Z_flip:
-                        self.initial_qubits_flips[1].append( s )
-
-                    self.state.act(s, pauli_opt)
-                    break
-
-
-        # Now unflip the qubits, they're a secret
-        self.state.qubit_values = np.zeros((2, 2*self.board_size*self.board_size))
-
-class ToricGameEnvLocalFixedErrs(ToricGameEnv):
-    def __init__(self, settings):
-        super().__init__(settings)
-        
-
-
-    def _set_initial_errors(self):
-        ''' Set random initial errors with an %error_rate rate
-            but report only the syndrome
-        '''
-
-        #first choose the first qubit to flip
-        for index_qubit in np.random.choice(len(self.state.qubit_pos), self.N, replace=False):
-
-
-            q = self.state.qubit_pos[index_qubit]
-            #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
-            if self.error_model == ErrorModel["UNCORRELATED"]:
-                pauli_opt = 0
-            elif self.error_model == ErrorModel["DEPOLARIZING"]:
-                pauli_opt = np.random.randint(0,3)
-
-            pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
-            pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
-
-
-            if pauli_X_flip:
-                self.initial_qubits_flips[0].append( q )
-            if pauli_Z_flip:
-                self.initial_qubits_flips[1].append( q )
-
-            self.state.act(q, pauli_opt)
-
-            dist_matrix = distance_matrix(self.state.qubit_pos, self.state.qubit_pos)
-            selected_dist_matrix = dist_matrix[index_qubit]/np.sum(dist_matrix[index_qubit])
-            weighted_matrix = (1-selected_dist_matrix)
-            where_zero = np.argwhere(weighted_matrix == np.max(weighted_matrix))[0]
-            weighted_matrix[where_zero] = 0
-            
-            if (self.N%2==0):
-                
-                probabilities = np.exp(-weighted_matrix/self.lambda_value)
-                probabilities = probabilities/np.sum(probabilities)
-                index_second_qubit = np.random.choice(range(len(self.state.qubit_pos)), p=probabilities)
-                
-                # if np.random.rand()*np.exp(-weighted_matrix[index_second_qubit]/self.lambda_value) < self.error_rate:
-                s = self.state.qubit_pos[index_second_qubit]
-                #print(f" qubit has bit flip error on {self.state.qubit_pos.index(q)}")
-                if self.error_model == ErrorModel["UNCORRELATED"]:
-                    pauli_opt = 0
-                elif self.error_model == ErrorModel["DEPOLARIZING"]:
-                    pauli_opt = np.random.randint(0,3)
-
-                pauli_X_flip = (pauli_opt==0 or pauli_opt==2)
-                pauli_Z_flip = (pauli_opt==1 or pauli_opt==2)
-
-
-                if pauli_X_flip:
-                    self.initial_qubits_flips[0].append( s )
-                if pauli_Z_flip:
-                    self.initial_qubits_flips[1].append( s )
-                
-
-                self.state.act(s, pauli_opt)
 
 
 
