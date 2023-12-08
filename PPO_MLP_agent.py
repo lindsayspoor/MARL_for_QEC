@@ -121,7 +121,7 @@ class PPO_agent:
             ppo= PPO
             policy = MlpPolicy
         
-        self.model = ppo(policy, self.env, clip_range=0.2, ent_coef=self.initialisation_settings['ent_coef'], learning_rate=self.initialisation_settings['lr'], verbose=0, policy_kwargs={"net_arch":dict(pi=[64,64], vf=[64,64])})
+        self.model = ppo(policy, self.env, ent_coef=self.initialisation_settings['ent_coef'], clip_range = self.initialisation_settings['clip_range'],learning_rate=self.initialisation_settings['lr'], verbose=0, policy_kwargs={"net_arch":dict(pi=[64,64], vf=[64,64])})
 
         print("initialisation done")
         print(self.model.policy)
@@ -634,7 +634,7 @@ class PPO_agent:
 
 
 #SETTINGS FOR RUNNING THIS SCRIPT
-train=False
+train=True
 curriculum=False #if set to True the agent will train on N_curriculum or error_rate_curriculum examples, using the training experience from 
 benchmark_MWPM=False
 save_files=True#
@@ -646,13 +646,14 @@ check_fails=False
 
 board_size=5
 error_rate=0.01
-ent_coef=0.0
-N=4 #the number of fixed initinal flips N the agent model is trained on or loaded when fixed is set to True
+ent_coef=0.05
+clip_range=0.1
+N=1 #the number of fixed initinal flips N the agent model is trained on or loaded when fixed is set to True
 logical_error_reward=5 #the reward the agent gets when it has removed all syndrome points, but the terminal board state claims that there is a logical error.
 success_reward=10 #the reward the agent gets when it has removed all syndrome points, and the terminal board state claims that there is no logical error, ans therefore the agent has successfully done its job.
 continue_reward=-1 #the reward the agent gets for each action that does not result in the terminal board state. If negative it gets penalized for each move it does, therefore giving the agent an incentive to remove syndromes in as less moves as possible.
 illegal_action_reward=-1 #the reward the agent gets when mask_actions is set to False and therefore the agent gets penalized by choosing an illegal action.
-total_timesteps=100000
+total_timesteps=3000000
 learning_rate= 0.001
 mask_actions=True #if set to True action masking is enabled, the illegal actions are masked out by the model. If set to False the agent gets a reward 'illegal_action_reward' when choosing an illegal action.
 log = True #if set to True the learning curve during training is registered and saved.
@@ -660,10 +661,10 @@ lambda_value=1
 fixed=True #if set to True the agent is trained on training examples with a fixed amount of N initial errors. If set to False the agent is trained on training examples given an error rate error_rate for each qubit to have a chance to be flipped.
 evaluate_fixed=True #if set to True the trained model is evaluated on examples with a fixed amount of N initial errors. If set to False the trained model is evaluated on examples in which each qubit is flipped with a chance of error_rate.
 N_evaluates = [1,2,3,4,5] #the number of fixed initial flips N the agent is evaluated on if evaluate_fixed is set to True.
-#N_evaluates=[2]
+N_evaluates=[2]
 error_rates_eval=list(np.linspace(0.01,0.1,4))
 N_curriculums=[1,2,3,4]
-N_curriculums=[4]
+#N_curriculums=[4]
 
 error_rates_curriculum=list(np.linspace(0.01,0.1,4))
 #error_rates_curriculum=[0.1]
@@ -682,7 +683,8 @@ initialisation_settings = {'board_size': board_size,
             'lambda': lambda_value,
             'fixed':fixed,
             'N':N,
-            'ent_coef':ent_coef
+            'ent_coef':ent_coef,
+            'clip_range':clip_range
             }
 
 #SET SETTINGS TO LOAD TRAINED AGENT ON
@@ -699,7 +701,8 @@ loaded_model_settings = {'board_size': board_size,
             'lambda': lambda_value,
             'fixed':fixed,
             'N':N,
-            'ent_coef':ent_coef
+            'ent_coef':ent_coef,
+            'clip_range':clip_range
             }
 
 evaluation_settings = {'board_size': board_size,
@@ -715,7 +718,8 @@ evaluation_settings = {'board_size': board_size,
             'lambda': lambda_value,
             'fixed':fixed,
             'N':N,
-            'ent_coef':ent_coef
+            'ent_coef':ent_coef,
+            'clip_range':clip_range
             }
 
 
